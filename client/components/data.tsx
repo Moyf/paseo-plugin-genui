@@ -30,6 +30,8 @@ import {
 } from "../../shared/logic/values";
 import { ErrorLine, RenderNode } from "../node-renderer";
 import { InTableContext, propsKey, toneColor, usePersistedState, useUiRuntime } from "../runtime";
+import { hasOwnNumber } from "../../shared/logic/reply";
+import { useItemFeedback } from "./feedback";
 
 export function Table({ props }: { props: Props }) {
   const { theme, compact } = useUiRuntime();
@@ -38,6 +40,7 @@ export function Table({ props }: { props: Props }) {
     return rec ? text(rec.label ?? rec.key) : text(col);
   });
   const rows = list(props.rows);
+  const feedback = useItemFeedback(`table:${propsKey(props.rows)}`, { comments: props.comments === true, editable: false });
 
   return (
     <InTableContext.Provider value={true}>
@@ -77,16 +80,17 @@ export function Table({ props }: { props: Props }) {
               : rec
                 ? columns.map((c) => rec[c] ?? null)
                 : [row];
+            const first = isNode(cells[0]) ? "" : text(cells[0]);
+            const controls = feedback.controls(rIdx, `row ${rIdx + 1}${first ? ` (${first})` : ""}`, {});
             return (
               <View
                 key={rIdx}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
                   borderTopWidth: rIdx === 0 ? 0 : StyleSheet.hairlineWidth,
                   borderTopColor: theme.colors.border,
                 }}
               >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
                 {columns.map((_, cIdx) => {
                   const cell = cells[cIdx];
                   return (
@@ -104,6 +108,8 @@ export function Table({ props }: { props: Props }) {
                     </View>
                   );
                 })}
+              </View>
+              {controls ? <View style={{ paddingHorizontal: 10, paddingBottom: 8 }}>{controls}</View> : null}
               </View>
             );
           })}
@@ -238,7 +244,7 @@ export function Chart({ props }: { props: Props }) {
                       borderRadius: 4,
                       backgroundColor: theme.colors.surface2,
                       borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: v > 0 ? theme.colors.accent : theme.colors.border,
+                      borderColor: theme.colors.border,
                       alignItems: "center",
                       justifyContent: "center",
                       opacity: v > 0 ? intensity : 0.4,
@@ -487,13 +493,17 @@ export function SegmentedBar({ props }: { props: Props }) {
 export function Steps({ props }: { props: Props }) {
   const { theme } = useUiRuntime();
   const items = list(props.items);
+  const feedback = useItemFeedback(`steps:${propsKey(props.items)}`, {
+    comments: props.comments === true,
+    editable: props.editable === true,
+  });
 
   return (
     <View style={{ gap: 8 }}>
       {items.map((item, idx) => {
         const obj = asRecord(item) ?? { title: text(item) };
-        const title = text(obj.title ?? obj.label);
-        const detail = optionalText(obj.detail);
+        const original = { title: text(obj.title ?? obj.label), detail: optionalText(obj.detail) ?? "" };
+        const { title, detail } = feedback.fields(idx, original);
         const status = text(obj.status);
         const color =
           status === "done"
@@ -529,6 +539,7 @@ export function Steps({ props }: { props: Props }) {
                   <InlineMarkdown text={detail} theme={theme} />
                 </Text>
               ) : null}
+              {feedback.controls(idx, hasOwnNumber(original.title) ? `step "${original.title}"` : `step ${idx + 1} (${original.title})`, original)}
             </View>
           </View>
         );
@@ -636,8 +647,8 @@ export function Calendar({ props }: { props: Props }) {
                   borderRadius: 6,
                   padding: 4,
                   backgroundColor: day === null ? "transparent" : theme.colors.surface1,
-                  borderWidth: dayEvents.length > 0 ? 1 : StyleSheet.hairlineWidth,
-                  borderColor: dayEvents.length > 0 ? theme.colors.accent : theme.colors.border,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: theme.colors.border,
                   gap: 2,
                 }}
               >

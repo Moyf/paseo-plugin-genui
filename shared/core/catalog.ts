@@ -60,6 +60,10 @@ const tone = { name: "tone", kind: "enum", optional: true, values: TONES } as co
 const label = { name: "label", kind: "string", optional: true } as const;
 const children = { name: "children", kind: "nodes" } as const;
 
+/** Lets the user comment on each item, and edit its text, before replying; both are queued into the reply. */
+const comments = { name: "comments", kind: "boolean", optional: true } as const;
+const editable = { name: "editable", kind: "boolean", optional: true } as const;
+
 export const COMPONENTS = {
   Card: {
     group: "Layout",
@@ -148,6 +152,7 @@ export const COMPONENTS = {
     params: [
       { name: "columns", kind: "list" },
       { name: "rows", kind: "list" },
+      comments,
     ],
     summary: "rows: lists of values or components",
   },
@@ -178,7 +183,7 @@ export const COMPONENTS = {
   },
   Steps: {
     group: "Data",
-    params: [{ name: "items", kind: "list" }],
+    params: [{ name: "items", kind: "list" }, comments, editable],
     summary: "{title,detail?,status?:done|current|blocked}",
   },
   Timeline: {
@@ -395,7 +400,7 @@ export const COMPONENTS = {
   },
   List: {
     group: "Content",
-    params: [{ name: "items", kind: "list" }],
+    params: [{ name: "items", kind: "list" }, comments, editable],
     summary: "rows {title, detail?, icon?, value?, tone?, action?}",
   },
   Calendar: {
@@ -435,9 +440,17 @@ export const COMPONENTS = {
     params: [children],
     summary: "a swipeable row of cards",
   },
+  Other: {
+    group: "Inputs",
+    params: [
+      { name: "label", kind: "string", optional: true },
+      { name: "placeholder", kind: "string", optional: true },
+    ],
+    summary: "an \"Other…\" button that opens a box for free-form feedback, queued into the reply",
+  },
   OptionCards: {
     group: "Inputs",
-    params: [{ name: "value", kind: "binding" }, { name: "options", kind: "list" }, label],
+    params: [{ name: "value", kind: "binding" }, { name: "options", kind: "list" }, label, comments],
     summary: "picture or detail options {value, title?, detail?, image?, icon?}; a list state picks several",
   },
   Swatches: {
@@ -518,7 +531,7 @@ export const COMPONENTS = {
   },
   Findings: {
     group: "Dev",
-    params: [{ name: "items", kind: "any" }, { name: "title", kind: "string", optional: true }],
+    params: [{ name: "items", kind: "any" }, { name: "title", kind: "string", optional: true }, comments, editable],
     summary: "review/lint/type errors [{severity, title, file?, line?, detail?, fix?, status?: open|fixed|confirmed|rejected}] or Load ESLint JSON, SARIF, tsc output",
   },
   Coverage: {
@@ -569,7 +582,7 @@ export const COMPONENTS = {
   },
   Plan: {
     group: "Manage",
-    params: [{ name: "steps", kind: "list" }, { name: "submit", kind: "string", optional: true }],
+    params: [{ name: "steps", kind: "list" }, { name: "submit", kind: "string", optional: true }, comments, editable],
     summary: "steps the user approves before you start [{title, detail?, files?, risk?, estimate?}]",
   },
   Decision: {
@@ -577,6 +590,7 @@ export const COMPONENTS = {
     params: [
       { name: "options", kind: "list" },
       { name: "criteria", kind: "list" },
+      comments,
     ],
     summary: "options [{name, scores: 1-5 per criterion, pros?, cons?}] vs criteria; user tunes weights",
   },
@@ -659,6 +673,10 @@ export const ACTIONS = {
   Copy: {
     params: [{ name: "text", kind: "string" }],
     summary: "copy text to the clipboard",
+  },
+  Queue: {
+    params: [{ name: "text", kind: "string" }],
+    summary: "add text to the user's reply without sending; the next Send sends it too",
   },
 } as const satisfies Record<string, ComponentSpec>;
 

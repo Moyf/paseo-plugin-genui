@@ -263,7 +263,7 @@ function GalleryBody({
                         borderRadius: 999,
                         backgroundColor: active ? theme.colors.accent : theme.colors.surface1,
                         borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: active ? theme.colors.accent : theme.colors.border,
+                        borderColor: active ? theme.colors.foregroundMuted : theme.colors.border,
                       }}
                     >
                       <Text
@@ -294,7 +294,7 @@ function GalleryBody({
                       borderRadius: 6,
                       backgroundColor: active ? theme.colors.surface2 : "transparent",
                       borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: active ? theme.colors.accent : theme.colors.border,
+                      borderColor: active ? theme.colors.foregroundMuted : theme.colors.border,
                     }}
                   >
                     <Text

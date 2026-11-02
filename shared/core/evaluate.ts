@@ -601,6 +601,8 @@ const Interpreter = defineClass(
           return { kind: "action", type: "send", text };
         case "Copy":
           return { kind: "action", type: "copy", text };
+        case "Queue":
+          return { kind: "action", type: "queue", text };
         case "OpenUrl":
           if (!/^https?:\/\//i.test(text)) throw new RuntimeError(first.pos, "OpenUrl needs an http:// or https:// URL");
           return { kind: "action", type: "openUrl", url: text };

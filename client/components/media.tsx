@@ -396,8 +396,8 @@ export function Hotspots({ props }: { props: Props }) {
                 gap: 8,
                 padding: 8,
                 borderRadius: 8,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: isSelected ? theme.colors.accent : theme.colors.border,
+                borderWidth: isSelected ? 1.5 : StyleSheet.hairlineWidth,
+                borderColor: isSelected ? theme.colors.foregroundMuted : theme.colors.border,
                 backgroundColor: theme.colors.surface2,
               }}
             >

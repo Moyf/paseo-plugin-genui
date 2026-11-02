@@ -1,3 +1,4 @@
+import { Icon } from "@getpaseo/plugin/client/react-native";
 import { ExternalLink } from "@getpaseo/plugin/client/ui";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -408,7 +409,7 @@ export function Environments() {
           style={{
             borderRadius: 8,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: env.current ? theme.colors.accent : theme.colors.border,
+            borderColor: theme.colors.border,
             backgroundColor: theme.colors.surface2,
             padding: 10,
             gap: 4,
@@ -554,14 +555,18 @@ export function Transcript({ props }: { props: Props }) {
           }}
           style={{
             alignSelf: "flex-start",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
             paddingHorizontal: 10,
             paddingVertical: 5,
             borderRadius: 6,
             backgroundColor: theme.colors.accent,
           }}
         >
+          <Icon name="Play" size={12} color={theme.colors.accentForeground} />
           <Text style={{ color: theme.colors.accentForeground, fontSize: 12, fontWeight: "600" }}>
-            ▶ Play recording
+            Play recording
           </Text>
         </Pressable>
       ) : null}

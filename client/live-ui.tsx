@@ -16,7 +16,9 @@ import {
 import type { Action, Diagnostic, Value } from "../shared/core/types";
 import type { GenUiBlockData, GenUiTextData } from "../shared/rpc";
 import { useAudioLoader, useImageLoader, useLoadedData, useTextLoader, type FileScope } from "./loaders";
+import { composeReply } from "../shared/logic/reply";
 import { RenderNodes } from "./render";
+import { clearQueue, queueOf, setQueued as setQueuedFor, useReplyQueue } from "./reply-queue";
 import { UiRuntimeContext, type UiRuntime } from "./runtime";
 import { canRenderWebIframe, mountSandboxedAppIframe, openWorkspaceFile, readStorage, writeStorage } from "./web";
 
@@ -102,14 +104,30 @@ export function LiveUi({
     [initial],
   );
 
+  // The gallery has no agent; its UIs share one local queue.
+  const queueAgent = agentId ?? "local";
+  const queue = useReplyQueue(queueAgent);
+  const queuePrefix = blockKey ?? stateKey;
+  const setQueued = useCallback(
+    (id: string, text: string | null) => setQueuedFor(queueAgent, `${queuePrefix}:${id}`, text),
+    [queueAgent, queuePrefix],
+  );
+
   const runAction = useCallback(
     async (action: Action) => {
       switch (action.type) {
         case "set":
           setValue(action.name, action.value);
           return;
+        case "queue": {
+          const id = `queue:${action.text}`;
+          const queued = queueOf(queueAgent).some((item) => item.id === `${queuePrefix}:${id}`);
+          setQueued(id, queued ? null : action.text);
+          return;
+        }
         case "send":
-          await send(action.text);
+          await send(composeReply(queueOf(queueAgent).map((item) => item.text), action.text));
+          clearQueue(queueAgent);
           setAnswer(action.text);
           writeStorage(answerKey, action.text);
           return;
@@ -122,7 +140,7 @@ export function LiveUi({
           return;
       }
     },
-    [answerKey, send, setValue, toast],
+    [answerKey, queueAgent, queuePrefix, send, setQueued, setValue, toast],
   );
 
   const runtime = useMemo<UiRuntime>(
@@ -134,6 +152,9 @@ export function LiveUi({
       loadAudio,
       playAudio,
       answer,
+      queue,
+      setQueued,
+      queued: (id) => queue.find((item) => item.id === `${queuePrefix}:${id}`)?.text ?? null,
       superseded,
       agentId,
       blockKey,
@@ -156,6 +177,9 @@ export function LiveUi({
       loadAudio,
       playAudio,
       answer,
+      queue,
+      queuePrefix,
+      setQueued,
       superseded,
       agentId,
       blockKey,

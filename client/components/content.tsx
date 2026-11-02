@@ -10,7 +10,8 @@ import { entityKind, imageRef, inlineFacts, sourceLinks } from "../../shared/log
 import { finiteNumber, isNode, list, optionalText, text, tone, type Props } from "../../shared/logic/values";
 import { InlineMarkdown, MarkdownText } from "../markdown";
 import { ErrorLine, RenderNode } from "../node-renderer";
-import { InTableContext, toneColor, toneMutedColor, useUiRuntime, type ImageUrl } from "../runtime";
+import { InTableContext, propsKey, toneColor, toneMutedColor, useUiRuntime, type ImageUrl } from "../runtime";
+import { useItemFeedback } from "./feedback";
 
 export function Text({ props }: { props: Props }) {
   const { theme, compact } = useUiRuntime();
@@ -25,31 +26,38 @@ export function Callout({ props }: { props: Props }) {
   const body = text(props.text);
   const title = optionalText(props.title);
   const t = tone(props.tone);
-  const borderColor = t === "neutral" ? theme.colors.border : toneColor(theme, t);
 
   return (
     <View
       style={{
         borderRadius: 8,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor,
-        borderLeftWidth: 3,
-        borderLeftColor: borderColor,
+        borderColor: theme.colors.border,
         backgroundColor: theme.colors.surface2,
         paddingHorizontal: 12,
         paddingVertical: 10,
-        gap: 4,
+        flexDirection: "row",
+        gap: 8,
       }}
     >
-      {title ? (
-        <RNText style={{ color: toneColor(theme, t), fontSize: 13, fontWeight: "600" }}>
-          {title}
-        </RNText>
-      ) : null}
-      <MarkdownText text={body} theme={theme} compact={compact} />
+      {t === "neutral" ? null : (
+        <View style={{ paddingTop: 2 }}>
+          <PaseoIcon name={CALLOUT_ICONS[t]} size={14} color={toneColor(theme, t)} />
+        </View>
+      )}
+      <View style={{ flex: 1, gap: 4 }}>
+        {title ? (
+          <RNText style={{ color: theme.colors.foreground, fontSize: 13, fontWeight: "600" }}>
+            {title}
+          </RNText>
+        ) : null}
+        <MarkdownText text={body} theme={theme} compact={compact} />
+      </View>
     </View>
   );
 }
+
+const CALLOUT_ICONS = { good: "CircleCheck", warn: "AlertTriangle", bad: "CircleX", info: "Info" } as const;
 
 export function Draft({ props }: { props: Props }) {
   const { theme, compact } = useUiRuntime();
@@ -496,6 +504,10 @@ export function Sources({ props }: { props: Props }) {
 export function List({ props }: { props: Props }) {
   const { theme, run } = useUiRuntime();
   const rows = parseListRows(props.items);
+  const feedback = useItemFeedback(`list:${propsKey(props.items)}`, {
+    comments: props.comments === true,
+    editable: props.editable === true,
+  });
 
   return (
     <View
@@ -509,6 +521,9 @@ export function List({ props }: { props: Props }) {
       {rows.map((item, idx) => {
         const iconName = item.icon ? resolveIconName(item.icon) ?? item.icon : null;
         const t = item.tone ?? "neutral";
+        const original = { title: item.title, detail: item.detail ?? "" };
+        const shown = feedback.fields(idx, original);
+        const controls = feedback.controls(idx, `"${item.title}"`, original);
         const rowContent = (
           <View
             style={{
@@ -528,11 +543,11 @@ export function List({ props }: { props: Props }) {
               ) : null}
               <View style={{ flex: 1, gap: 2 }}>
                 <RNText style={{ color: theme.colors.foreground, fontSize: 13, fontWeight: "500" }}>
-                  {item.title}
+                  {shown.title}
                 </RNText>
-                {item.detail ? (
+                {shown.detail ? (
                   <RNText style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>
-                    <InlineMarkdown text={item.detail} theme={theme} />
+                    <InlineMarkdown text={shown.detail} theme={theme} />
                   </RNText>
                 ) : null}
               </View>
@@ -548,12 +563,17 @@ export function List({ props }: { props: Props }) {
             ) : null}
           </View>
         );
-        return item.actions.length > 0 ? (
-          <Pressable key={idx} accessibilityRole="button" onPress={() => void run(item.actions)}>
-            {rowContent}
-          </Pressable>
-        ) : (
-          <View key={idx}>{rowContent}</View>
+        return (
+          <View key={idx}>
+            {item.actions.length > 0 ? (
+              <Pressable accessibilityRole="button" onPress={() => void run(item.actions)}>
+                {rowContent}
+              </Pressable>
+            ) : (
+              rowContent
+            )}
+            {controls ? <View style={{ paddingHorizontal: 12, paddingBottom: 9 }}>{controls}</View> : null}
+          </View>
         );
       })}
     </View>

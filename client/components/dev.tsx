@@ -37,6 +37,7 @@ import {
 import { finiteNumber, optionalText, text, type Props } from "../../shared/logic/values";
 import { ErrorLine } from "../node-renderer";
 import { propsKey, toneColor, usePersistedState, useUiRuntime } from "../runtime";
+import { useItemFeedback } from "./feedback";
 
 export function Logs({ props }: { props: Props }) {
   const { theme } = useUiRuntime();
@@ -242,6 +243,10 @@ export function Findings({ props }: { props: Props }) {
   const { theme, run, openFile } = useUiRuntime();
   const parsed = useMemo(() => readFindings(props.items), [props.items]);
   const title = optionalText(props.title);
+  const feedback = useItemFeedback(`findings:${propsKey(props.items)}`, {
+    comments: props.comments === true,
+    editable: props.editable === true,
+  });
   if (!parsed.ok) return <ErrorLine message={parsed.error} />;
   const { report } = parsed;
 
@@ -272,6 +277,8 @@ export function Findings({ props }: { props: Props }) {
       </View>
       {report.findings.map((item, idx) => {
         const loc = findingLocation(item);
+        const original = { title: item.title, detail: item.detail ?? "" };
+        const shown = feedback.fields(idx, original);
         const sevColor =
           item.severity === "critical" || item.severity === "high"
             ? theme.colors.statusDanger
@@ -292,7 +299,7 @@ export function Findings({ props }: { props: Props }) {
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <Text style={{ color: theme.colors.foreground, fontSize: 13, fontWeight: "600", flex: 1 }}>
-                {item.title}
+                {shown.title}
               </Text>
               <Text style={{ color: sevColor, fontSize: 11, fontWeight: "700", textTransform: "uppercase" }}>
                 {severityLabel(item.severity, report.scale)}
@@ -309,9 +316,10 @@ export function Findings({ props }: { props: Props }) {
                 </Text>
               </Pressable>
             ) : null}
-            {item.detail ? (
-              <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}><InlineMarkdown text={item.detail} theme={theme} /></Text>
+            {shown.detail ? (
+              <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}><InlineMarkdown text={shown.detail} theme={theme} /></Text>
             ) : null}
+            {feedback.controls(idx, `finding "${item.title}"`, original)}
             <Pressable
               onPress={() => {
                 const msg = fixThisMessage(item);
@@ -853,12 +861,12 @@ export function Tests({ props }: { props: Props }) {
               }}
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-                <Text style={{ color: theme.colors.foreground, fontSize: 12.5, flex: 1 }}>
-                  <Text style={{ color, fontWeight: "700" }}>
-                    {tc.status === "passed" ? "✓ " : tc.status === "failed" ? "✗ " : "○ "}
-                  </Text>
-                  {tc.name}
-                </Text>
+                <View style={{ flexDirection: "row", gap: 6, flex: 1 }}>
+                  <View style={{ paddingTop: 1 }}>
+                    <Icon name={tc.status === "passed" ? "CircleCheck" : tc.status === "failed" ? "CircleX" : "Circle"} size={13} color={color} />
+                  </View>
+                  <Text style={{ color: theme.colors.foreground, fontSize: 12.5, flex: 1 }}>{tc.name}</Text>
+                </View>
                 {tc.ms !== null ? (
                   <Text style={{ color: theme.colors.foregroundMuted, fontSize: 11.5 }}>
                     {formatDuration(tc.ms)}

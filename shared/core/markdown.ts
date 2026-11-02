@@ -639,6 +639,8 @@ function block(node: UiNode): string {
     }
     case "Button":
       return `Options: ${buttonLabel(node)}`;
+    case "Other":
+      return `Options: ${inline(props.label).trim() || "Other…"}`;
     case "Form":
       return paragraphs([...blocks(children(props.children), false), `Submit: ${inline(props.submit).trim() || "Send"}`]);
     case "Timer": {

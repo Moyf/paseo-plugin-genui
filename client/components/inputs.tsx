@@ -38,7 +38,8 @@ import {
   type Props,
 } from "../../shared/logic/values";
 import { ErrorLine, RenderNodes, type GroupedButton } from "../node-renderer";
-import { useUiRuntime } from "../runtime";
+import { propsKey, useUiRuntime } from "../runtime";
+import { useItemFeedback } from "./feedback";
 import { LoadedImageView } from "./content";
 
 function FieldLabel({ label, value }: { label: string | null; value?: string }) {
@@ -345,7 +346,7 @@ export function Radio({ props }: { props: Props }) {
                 padding: 10,
                 borderRadius: 8,
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: active ? theme.colors.accent : theme.colors.border,
+                borderColor: theme.colors.border,
                 backgroundColor: theme.colors.surface2,
               }}
             >
@@ -421,24 +422,11 @@ export function Checklist({ props }: { props: Props }) {
                 paddingVertical: 8,
                 borderRadius: 8,
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: checked ? theme.colors.accent : theme.colors.border,
+                borderColor: theme.colors.border,
                 backgroundColor: theme.colors.surface2,
               }}
             >
-              <View
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 4,
-                  borderWidth: 1.5,
-                  borderColor: checked ? theme.colors.accent : theme.colors.foregroundMuted,
-                  backgroundColor: checked ? theme.colors.accent : "transparent",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {checked ? <Icon name="Check" size={11} color={theme.colors.accentForeground} /> : null}
-              </View>
+              <CheckBox checked={checked} />
               <Text style={{ color: theme.colors.foreground, fontSize: 13 }}>{itemText(opt)}</Text>
             </Pressable>
           );
@@ -616,22 +604,10 @@ export function Rating({ props }: { props: Props }) {
             <Pressable
               key={star}
               onPress={() => setValue(binding.name, star === current ? 0 : star)}
-              style={{
-                paddingHorizontal: 8,
-                paddingVertical: 5,
-                borderRadius: 6,
-                backgroundColor: active ? theme.colors.accent : theme.colors.surface2,
-              }}
+              accessibilityLabel={`${star} of ${max}`}
+              style={{ padding: 3 }}
             >
-              <Text
-                style={{
-                  color: active ? theme.colors.accentForeground : theme.colors.foregroundMuted,
-                  fontSize: 13,
-                  fontWeight: "600",
-                }}
-              >
-                ★ {star}
-              </Text>
+              <Icon name="Star" size={18} color={active ? theme.colors.accent : theme.colors.foregroundMuted} />
             </Pressable>
           );
         })}
@@ -642,6 +618,7 @@ export function Rating({ props }: { props: Props }) {
 
 export function OptionCards({ props }: { props: Props }) {
   const { theme, compact, setValue } = useUiRuntime();
+  const feedback = useItemFeedback(`options:${propsKey(props.options)}`, { comments: props.comments === true, editable: false });
   const binding = isBinding(props.value) ? props.value : null;
   if (!binding) return <ErrorLine message="OptionCards expects a $state binding" />;
   const options = cardOptions(props.options);
@@ -659,8 +636,22 @@ export function OptionCards({ props }: { props: Props }) {
           const selected = isMulti ? pickedList.includes(opt.value) : binding.value === opt.value;
           const iconName = opt.icon ? resolveIconName(opt.icon) ?? opt.icon : null;
           return (
-            <Pressable
+            <View
               key={idx}
+              style={{
+                flex: compact ? undefined : 1,
+                minWidth: 150,
+                borderRadius: 10,
+                borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
+                borderColor: selected ? theme.colors.foregroundMuted : theme.colors.border,
+                backgroundColor: theme.colors.surface2,
+                padding: 10,
+                gap: 6,
+              }}
+            >
+            <Pressable
+              accessibilityRole={isMulti ? "checkbox" : "radio"}
+              accessibilityState={{ checked: selected }}
               onPress={() => {
                 if (isMulti) {
                   setValue(binding.name, togglePick(pickedList, opt.value, allValues));
@@ -668,16 +659,7 @@ export function OptionCards({ props }: { props: Props }) {
                   setValue(binding.name, opt.value);
                 }
               }}
-              style={{
-                flex: compact ? undefined : 1,
-                minWidth: 150,
-                borderRadius: 10,
-                borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
-                borderColor: selected ? theme.colors.accent : theme.colors.border,
-                backgroundColor: theme.colors.surface2,
-                padding: 10,
-                gap: 6,
-              }}
+              style={{ gap: 6 }}
             >
               {opt.image ? <LoadedImageView src={opt.image} alt={opt.title} height={100} zoomable={false} /> : null}
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -690,6 +672,8 @@ export function OptionCards({ props }: { props: Props }) {
                 <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}><InlineMarkdown text={opt.detail} theme={theme} /></Text>
               ) : null}
             </Pressable>
+            {feedback.controls(idx, `option "${opt.title}"`, {})}
+            </View>
           );
         })}
       </View>
@@ -724,7 +708,7 @@ export function Swatches({ props }: { props: Props }) {
                 paddingVertical: 5,
                 borderRadius: 8,
                 borderWidth: active ? 1.5 : StyleSheet.hairlineWidth,
-                borderColor: active ? theme.colors.accent : theme.colors.border,
+                borderColor: active ? theme.colors.foregroundMuted : theme.colors.border,
                 backgroundColor: theme.colors.surface2,
               }}
             >
@@ -807,9 +791,7 @@ export function EditableTable({ props }: { props: Props }) {
                       onPress={() => setValue(binding.name, setCell(rows, rIdx, col.key, !cellVal))}
                       style={{ width: 130, paddingHorizontal: 8, paddingVertical: 6 }}
                     >
-                      <Text style={{ color: theme.colors.foreground, fontSize: 12.5 }}>
-                        {cellVal ? "☑ Yes" : "☐ No"}
-                      </Text>
+                      <CheckBox checked={Boolean(cellVal)} />
                     </Pressable>
                   );
                 }
@@ -866,7 +848,7 @@ export function EditableTable({ props }: { props: Props }) {
 }
 
 export function Button({ props }: { props: Props }) {
-  const { theme, run } = useUiRuntime();
+  const { theme, run, queued } = useUiRuntime();
   const label = text(props.label);
   const variant = text(props.variant) || "secondary";
   const rawIcon = optionalText(props.icon);
@@ -876,6 +858,9 @@ export function Button({ props }: { props: Props }) {
     : isAction(props.action)
       ? [props.action]
       : [{ kind: "action", type: "send", text: label }];
+  // A button whose actions only queue shows as pressed while its text is in the reply.
+  const queueTexts = actions.flatMap((action) => (action.type === "queue" ? [action.text] : []));
+  const isQueued = queueTexts.length > 0 && queueTexts.every((t) => queued(`queue:${t}`) !== null);
 
   const bg =
     variant === "primary"
@@ -891,6 +876,7 @@ export function Button({ props }: { props: Props }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ selected: isQueued }}
       onPress={() => void run(actions)}
       style={{
         alignSelf: "flex-start",
@@ -905,7 +891,7 @@ export function Button({ props }: { props: Props }) {
         borderColor: variant === "secondary" ? theme.colors.border : bg,
       }}
     >
-      {iconName ? <Icon name={iconName} size={14} color={fg} /> : null}
+      {isQueued ? <Icon name="Check" size={14} color={fg} /> : iconName ? <Icon name={iconName} size={14} color={fg} /> : null}
       <Text style={{ color: fg, fontSize: 12.5, fontWeight: "600" }}>{label}</Text>
     </Pressable>
   );
@@ -990,6 +976,27 @@ export function FollowUps({ props }: { props: Props }) {
           <Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{prompt}</Text>
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+/** A real checkbox: the box alone shows the state, so rows around it keep neutral borders. */
+export function CheckBox({ checked }: { checked: boolean }) {
+  const { theme } = useUiRuntime();
+  return (
+    <View
+      style={{
+        width: 16,
+        height: 16,
+        borderRadius: 4,
+        borderWidth: 1.5,
+        borderColor: checked ? theme.colors.accent : theme.colors.foregroundMuted,
+        backgroundColor: checked ? theme.colors.accent : "transparent",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {checked ? <Icon name="Check" size={11} color={theme.colors.accentForeground} /> : null}
     </View>
   );
 }

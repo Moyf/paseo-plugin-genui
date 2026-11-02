@@ -4,7 +4,7 @@
 
 ![Inline Map, Calendar, and Budget UI in Paseo chat](assets/screenshot-chat.png)
 
-![Gen-UI Gallery with 86 components and 173 live examples](assets/screenshot-gallery.png)
+![Gen-UI Gallery with 88 components and 176 live examples](assets/screenshot-gallery.png)
 
 ![Interactive Playground in Paseo](assets/screenshot-playground.png)
 
@@ -43,7 +43,7 @@ Card("Estimate", [
 
 Paseo renders a card with a plan switch, a seat slider, and a live total. Moving the slider recomputes the total in place without another model call. Clicking the button sends your choice back to the agent.
 
-## Components (86 across 10 groups)
+## Components (88 across 10 groups)
 
 | Group | Components |
 | --- | --- |
@@ -51,7 +51,7 @@ Paseo renders a card with a plan switch, a seat slider, and a live total. Moving
 | **Content** | `Text` · `Callout` · `Draft` · `Metric` · `Badge` · `Icon` · `KeyValue` · `Image` · `File` · `Entity` · `Sources` · `List` |
 | **Data** | `Table` · `Chart` (bar, line, area, pie, scatter, radar, funnel, heatmap) · `Sparkline` · `Progress` · `Gauge` · `SegmentedBar` · `Steps` · `Timeline` · `Calendar` · `CalendarHeatmap` · `Tree` · `Code` · `Snippet` · `Diff` · `Diagram` |
 | **Media** | `ImageSearch` · `Gallery` · `Map` · `Hotspots` |
-| **Inputs** | `Slider` · `Stepper` · `Toggle` · `Choice` · `Radio` · `Select` · `Checklist` · `ListEditor` · `Input` · `TextArea` · `DateInput` · `Rating` · `OptionCards` · `Swatches` · `EditableTable` · `Button` · `Form` · `FollowUps` |
+| **Inputs** | `Slider` · `Stepper` · `Toggle` · `Choice` · `Radio` · `Select` · `Checklist` · `ListEditor` · `Input` · `TextArea` · `DateInput` · `Rating` · `OptionCards` · `Swatches` · `EditableTable` · `Button` · `Form` · `FollowUps` · `Other` |
 | **Widgets** | `Timer` · `Quiz` · `Flashcards` · `Walkthrough` |
 | **Project** | `Changes` · `Commits` · `PullRequest` · `Threads` · `Tests` · `Json` |
 | **Dev** | `Logs` · `StackTrace` · `Findings` · `Coverage` · `Dependencies` · `Pipeline` · `Benchmark` · `Waterfall` · `Treemap` |
@@ -62,7 +62,7 @@ Paseo renders a card with a plan switch, a seat slider, and a live total. Moving
 
 - `/genui [prompt]` — Teach an existing agent the Generative UI component language.
 - `/genui-demo [ComponentName]` — Insert a live interactive Gen-UI block into the current chat (e.g. `/genui-demo Decision` or `/genui-demo Map`).
-- `/genui-gallery` — Open the **Gen-UI Gallery** screen (173 examples across all 86 components, plus a live spec Playground).
+- `/genui-gallery` — Open the **Gen-UI Gallery** screen (176 examples across all 88 components, plus a live spec Playground).
 
 ## Develop
 

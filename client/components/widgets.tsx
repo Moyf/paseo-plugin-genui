@@ -1,6 +1,9 @@
 import { ExternalLink } from "@getpaseo/plugin/client/ui";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { hasOwnNumber } from "../../shared/logic/reply";
+import { useItemFeedback } from "./feedback";
+import { CheckBox } from "./inputs";
 import {
   decisionMessage,
   estimateTask,
@@ -342,6 +345,10 @@ export function Plan({ props }: { props: Props }) {
     initialChecks(steps),
     (v) => (Array.isArray(v) ? v.map(Boolean) : null),
   );
+  const feedback = useItemFeedback(`plan:${propsKey(props.steps)}`, {
+    comments: props.comments === true,
+    editable: props.editable === true,
+  });
   if (error) return <ErrorLine message={error} />;
   const total = planTotal(steps, checked);
 
@@ -349,16 +356,17 @@ export function Plan({ props }: { props: Props }) {
     <View style={{ gap: 8 }}>
       {steps.map((step, idx) => {
         const isOn = checked[idx] !== false;
+        const original = { title: step.title, detail: step.detail ?? "" };
+        const shown = feedback.fields(idx, original);
+        const toggle = () =>
+          setChecked((prev) => {
+            const next = [...prev];
+            next[idx] = !isOn;
+            return next;
+          });
         return (
-          <Pressable
+          <View
             key={idx}
-            onPress={() =>
-              setChecked((prev) => {
-                const next = [...prev];
-                next[idx] = !isOn;
-                return next;
-              })
-            }
             style={{
               flexDirection: "row",
               alignItems: "flex-start",
@@ -366,41 +374,42 @@ export function Plan({ props }: { props: Props }) {
               padding: 10,
               borderRadius: 8,
               borderWidth: StyleSheet.hairlineWidth,
-              borderColor: isOn ? theme.colors.accent : theme.colors.border,
+              borderColor: theme.colors.border,
               backgroundColor: theme.colors.surface2,
             }}
           >
-            <Text style={{ color: isOn ? theme.colors.accent : theme.colors.foregroundMuted, fontSize: 14 }}>
-              {isOn ? "☑" : "☐"}
-            </Text>
-            <View style={{ flex: 1, gap: 3 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: isOn }} onPress={toggle} style={{ paddingTop: 1 }}>
+              <CheckBox checked={isOn} />
+            </Pressable>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Pressable onPress={toggle} style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                 <Text style={{ color: theme.colors.foreground, fontSize: 13, fontWeight: "600", flex: 1 }}>
-                  {idx + 1}. {step.title}
+                  {hasOwnNumber(shown.title) ? shown.title : `${idx + 1}. ${shown.title}`}
                 </Text>
                 {step.estimate ? (
                   <Text style={{ color: theme.colors.foregroundMuted, fontSize: 11.5 }}>
                     {step.estimate}
                   </Text>
                 ) : null}
-              </View>
-              {step.detail ? (
-                <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}><InlineMarkdown text={step.detail} theme={theme} /></Text>
+              </Pressable>
+              {shown.detail ? (
+                <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}><InlineMarkdown text={shown.detail} theme={theme} /></Text>
               ) : null}
               {step.files.length > 0 ? (
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   {step.files.map((f, fIdx) => (
                     <Text
                       key={fIdx}
-                      style={{ color: theme.colors.accent, fontFamily: "monospace", fontSize: 11 }}
+                      style={{ color: theme.colors.foregroundMuted, fontFamily: "monospace", fontSize: 11 }}
                     >
                       {f.path}
                     </Text>
                   ))}
                 </View>
               ) : null}
+              {feedback.controls(idx, hasOwnNumber(step.title) ? `step "${step.title}"` : `step ${idx + 1} (${step.title})`, original)}
             </View>
-          </Pressable>
+          </View>
         );
       })}
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -434,6 +443,7 @@ export function Plan({ props }: { props: Props }) {
 
 export function Decision({ props }: { props: Props }) {
   const { theme, run } = useUiRuntime();
+  const feedback = useItemFeedback(`decision:${propsKey(props.options)}`, { comments: props.comments === true, editable: false });
   const parsed = readDecision(props.options, props.criteria);
   if (!parsed.ok) return <ErrorLine message={parsed.error} />;
   const { model } = parsed;
@@ -508,8 +518,8 @@ export function Decision({ props }: { props: Props }) {
               key={entry.index}
               style={{
                 borderRadius: 8,
-                borderWidth: isLeader ? 1.5 : StyleSheet.hairlineWidth,
-                borderColor: isLeader ? theme.colors.accent : theme.colors.border,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: theme.colors.border,
                 backgroundColor: theme.colors.surface2,
                 padding: 10,
                 gap: 6,
@@ -519,7 +529,7 @@ export function Decision({ props }: { props: Props }) {
                 <Text style={{ color: theme.colors.foreground, fontSize: 13.5, fontWeight: "600" }}>
                   {opt.name}
                 </Text>
-                <Text style={{ color: theme.colors.accent, fontSize: 13, fontWeight: "700" }}>
+                <Text style={{ color: theme.colors.foreground, fontSize: 13, fontWeight: isLeader ? "700" : "500" }}>
                   {round(entry.total, 2)} / {model.scale}
                 </Text>
               </View>
@@ -556,6 +566,7 @@ export function Decision({ props }: { props: Props }) {
                   Go with {opt.name}
                 </Text>
               </Pressable>
+              {feedback.controls(entry.index, `option "${opt.name}"`, {})}
             </View>
           );
         })}

@@ -28,10 +28,24 @@ const INLINE =
   /(`[^`]+`|\[[^\]\n]+\]\([^)\s]+\)|https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]*_]|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_)/;
 const LINK = /^\[([^\]\n]+)\]\(([^)\s]+)\)$/;
 
+const WORD_CHAR = /[A-Za-z0-9]/;
+
+/** `_x_` inside a word, as in review_gate_per_project, is not emphasis (CommonMark's rule). */
+function intraword(pieces: readonly string[], index: number): boolean {
+  const before = pieces[index - 1] ?? "";
+  const after = pieces[index + 1] ?? "";
+  return WORD_CHAR.test(before.slice(-1)) || WORD_CHAR.test(after.slice(0, 1));
+}
+
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
-  for (const piece of text.split(INLINE)) {
+  const pieces = text.split(INLINE);
+  for (const [index, piece] of pieces.entries()) {
     if (piece.length === 0) continue;
+    if (piece.startsWith("_") && piece.endsWith("_") && intraword(pieces, index)) {
+      out.push({ kind: "text", text: piece });
+      continue;
+    }
     const link = LINK.exec(piece);
     if (piece.startsWith("`") && piece.endsWith("`") && piece.length > 1) {
       out.push({ kind: "code", text: piece.slice(1, -1) });

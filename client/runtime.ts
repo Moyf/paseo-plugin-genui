@@ -2,6 +2,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { createContext, useCallback, useContext, useState } from "react";
 import type { Action, Value } from "../shared/core/types";
 import type { Tone } from "../shared/logic/values";
+import type { QueuedReply } from "./reply-queue";
 import { readStorage, writeStorage } from "./web";
 
 export type ImageUrl =
@@ -21,6 +22,12 @@ export interface UiRuntime {
   loadAudio: ((src: string) => Promise<ImageUrl>) | null;
   playAudio: ((dataUrl: string) => Promise<void>) | null;
   answer: string | null;
+  /** The reply being built across this chat's UIs; the next send carries it. */
+  queue: readonly QueuedReply[];
+  /** Adds, replaces or (null) removes this block's queue entry `id`. */
+  setQueued(id: string, text: string | null): void;
+  /** The text of this block's queue entry `id`, or null. */
+  queued(id: string): string | null;
   superseded: boolean;
   agentId: string | null;
   blockKey: string | null;

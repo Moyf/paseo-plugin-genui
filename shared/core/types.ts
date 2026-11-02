@@ -64,7 +64,8 @@ export type Action =
       readonly value: Value;
     }
   | { readonly kind: "action"; readonly type: "openUrl"; readonly url: string }
-  | { readonly kind: "action"; readonly type: "copy"; readonly text: string };
+  | { readonly kind: "action"; readonly type: "copy"; readonly text: string }
+  | { readonly kind: "action"; readonly type: "queue"; readonly text: string };
 
 /** Mutable state of one rendered UI: `$name` → value (keys exclude the `$`). */
 export type UiState = Readonly<Record<string, Value>>;

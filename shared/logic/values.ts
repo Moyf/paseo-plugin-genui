@@ -42,6 +42,7 @@ export function isAction(value: unknown): value is Action {
   switch (value.type) {
     case "send":
     case "copy":
+    case "queue":
       return typeof value.text === "string";
     case "openUrl":
       return typeof value.url === "string";

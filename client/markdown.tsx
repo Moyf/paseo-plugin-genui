@@ -102,11 +102,7 @@ function BlockView({
   if (block.kind === "quote") {
     return (
       <View
-        style={{
-          borderLeftWidth: 2,
-          borderLeftColor: theme.colors.accent,
-          paddingLeft: 10,
-        }}
+        style={{ paddingLeft: 12 }}
       >
         <Text selectable style={{ ...body, color: theme.colors.foregroundMuted }}>
           <Spans content={block.content} theme={theme} />

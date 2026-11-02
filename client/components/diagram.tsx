@@ -205,7 +205,7 @@ export function Diagram({ props }: { props: Props }) {
           style={{
             borderRadius: 8,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.accent,
+            borderColor: theme.colors.border,
             backgroundColor: theme.colors.surface2,
             padding: 10,
             gap: 6,

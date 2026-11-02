@@ -66,6 +66,7 @@ import {
   TextArea,
   Toggle,
 } from "./components/inputs";
+import { Other } from "./components/feedback";
 import { Card, Carousel, Details, Divider, Grid, Row, Stack, Tabs } from "./components/layout";
 import { Gallery, Hotspots, ImageSearch, MapView } from "./components/media";
 import {
@@ -140,6 +141,7 @@ export const RENDERERS = {
   Flashcards,
   Carousel,
   OptionCards,
+  Other,
   Swatches,
   EditableTable,
   FollowUps,

@@ -17,6 +17,7 @@ import {
   GalleryWorkspacePanel,
 } from "./client/gallery";
 import { TimelineBlockItem, TimelineTextItem } from "./client/live-ui";
+import { registerQueuePills } from "./client/queue-pill";
 import { GenUiSettingsScreen } from "./client/settings";
 
 export default function contribute(client: PluginClientContext) {
@@ -29,6 +30,8 @@ export default function contribute(client: PluginClientContext) {
     const base64 = dataUrl.slice(comma + 1);
     await client.playAudio({ base64, mimeType });
   };
+
+  const removeQueuePills = registerQueuePills(client);
 
   client.addTimelineTransformer({
     id: "genui-assistant",
@@ -160,5 +163,7 @@ export default function contribute(client: PluginClientContext) {
     },
   });
 
-  return () => {};
+  return () => {
+    removeQueuePills();
+  };
 }

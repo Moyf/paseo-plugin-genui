@@ -2,7 +2,7 @@
 
 **Agents answer with charts, diagrams, maps, plans, and forms rendered inline in the Paseo chat timeline.**
 
-![Inline Map, Calendar, and Budget UI in Paseo chat](assets/screenshot-chat.png)
+![A Plan with a comment, a queued choice and the reply pill in Paseo chat](assets/screenshot-chat.png)
 
 ![Gen-UI Gallery with 88 components and 176 live examples](assets/screenshot-gallery.png)
 

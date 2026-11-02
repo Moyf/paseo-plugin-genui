@@ -10,6 +10,8 @@ import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { COMPONENTS, componentSignature, type ComponentGroup, type ComponentName } from "../shared/core/catalog";
+
+const COMPONENT_COUNT = Object.keys(COMPONENTS).length;
 import { componentsIn, GALLERY_GROUPS, searchComponents } from "../shared/logic/gallery-search";
 import { galleryGetRpc, galleryListRpc } from "../shared/rpc";
 import { SpecBlockView } from "./live-ui";
@@ -154,7 +156,7 @@ function GalleryBody({
             Generative UI Gallery
           </Text>
           <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12.5 }}>
-            86 components in 10 groups · {files.length} live examples
+            {COMPONENT_COUNT} components in 10 groups · {files.length} live examples
           </Text>
         </View>
         <View style={{ flexDirection: "row", gap: 6 }}>
@@ -231,7 +233,7 @@ function GalleryBody({
                 setQuery(txt);
                 if (txt.trim()) setSelectedComponent(null);
               }}
-              placeholder="Search 86 components (e.g. Chart, Diagram, Map, Decision, Kanban)…"
+              placeholder={`Search ${COMPONENT_COUNT} components (e.g. Chart, Diagram, Map, Decision, Kanban)…`}
               placeholderTextColor={theme.colors.foregroundMuted}
               style={{
                 borderRadius: 8,
@@ -299,7 +301,7 @@ function GalleryBody({
                   >
                     <Text
                       style={{
-                        color: active ? theme.colors.accent : theme.colors.foregroundMuted,
+                        color: active ? theme.colors.foreground : theme.colors.foregroundMuted,
                         fontSize: 11.5,
                         fontFamily: "monospace",
                       }}

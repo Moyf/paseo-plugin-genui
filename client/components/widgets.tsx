@@ -402,7 +402,7 @@ export function Plan({ props }: { props: Props }) {
                       key={fIdx}
                       style={{ color: theme.colors.foregroundMuted, fontFamily: "monospace", fontSize: 11 }}
                     >
-                      {f.path}
+                      {f.line === null ? f.path : `${f.path}:${f.line}`}
                     </Text>
                   ))}
                 </View>

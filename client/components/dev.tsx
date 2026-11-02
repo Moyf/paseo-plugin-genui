@@ -319,24 +319,28 @@ export function Findings({ props }: { props: Props }) {
             {shown.detail ? (
               <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}><InlineMarkdown text={shown.detail} theme={theme} /></Text>
             ) : null}
-            {feedback.controls(idx, `finding "${item.title}"`, original)}
-            <Pressable
-              onPress={() => {
-                const msg = fixThisMessage(item);
-                void run([{ kind: "action", type: "send", text: msg }]);
-              }}
-              style={{
-                alignSelf: "flex-start",
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 6,
-                backgroundColor: theme.colors.surface1,
-              }}
-            >
-              <Text style={{ color: theme.colors.foreground, fontSize: 11.5, fontWeight: "500" }}>
-                Fix this
-              </Text>
-            </Pressable>
+            {feedback.controls(
+              idx,
+              `finding "${item.title}"`,
+              original,
+              <Pressable
+                onPress={() => {
+                  const msg = fixThisMessage(item);
+                  void run([{ kind: "action", type: "send", text: msg }]);
+                }}
+                style={{
+                  alignSelf: "flex-start",
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.surface1,
+                }}
+              >
+                <Text style={{ color: theme.colors.foreground, fontSize: 11.5, fontWeight: "500" }}>
+                  Fix this
+                </Text>
+              </Pressable>,
+            )}
           </View>
         );
       })}

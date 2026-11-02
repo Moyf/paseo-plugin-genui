@@ -84,6 +84,11 @@ export function RenderNode({ node }: { node: UiNode }): ReactNode {
   return <Renderer props={node.props} />;
 }
 
+/** Buttons and Other sit together in one wrapping, left-aligned group. */
+export function isButtonLike(node: UiNode): boolean {
+  return node.type === "Button" || node.type === "Other";
+}
+
 export function RenderNodes({
   nodes,
   isolate = false,
@@ -107,7 +112,7 @@ export function RenderNodes({
       <RenderNode key={key} node={node} />
     );
 
-    if (node.type !== "Button" || !Group) {
+    if (!isButtonLike(node) || !Group) {
       run = null;
       out.push(element);
     } else if (run === null) {

@@ -2,7 +2,7 @@ import { Icon } from "@getpaseo/plugin/client/react-native";
 import React, { useContext, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { finiteNumber, list, nodes, optionalText, text, type Props } from "../../shared/logic/values";
-import { RenderNode, RenderNodes } from "../node-renderer";
+import { isButtonLike, RenderNode, RenderNodes } from "../node-renderer";
 import { CardDepthContext, propsKey, usePersistedState, useUiRuntime } from "../runtime";
 
 export function Card({ props }: { props: Props }) {
@@ -46,6 +46,8 @@ export function Card({ props }: { props: Props }) {
 export function Row({ props }: { props: Props }) {
   const { compact } = useUiRuntime();
   const children = nodes(props.children);
+  // Equal columns suit content; a row of buttons reads as one group instead.
+  if (children.length > 0 && children.every(isButtonLike)) return <RenderNodes nodes={children} />;
   return (
     <View
       style={{

@@ -39,14 +39,15 @@ export function useItemFeedback(scope: string, options: { comments: boolean; edi
     fields<T extends Fields>(index: number, original: T): T {
       return { ...original, ...(notes[index]?.edits ?? {}) };
     },
-    controls(index: number, label: string, original: Fields): React.ReactNode {
-      if (!options.comments && !options.editable) return null;
+    controls(index: number, label: string, original: Fields, leading?: React.ReactNode): React.ReactNode {
+      if (!options.comments && !options.editable) return leading ?? null;
       return (
         <ItemFeedback
           note={notes[index] ?? {}}
           original={original}
           comments={options.comments}
           editable={options.editable}
+          leading={leading}
           onChange={(note) => update(index, label, original, note)}
         />
       );
@@ -59,12 +60,15 @@ function ItemFeedback({
   original,
   comments,
   editable,
+  leading,
   onChange,
 }: {
   note: ItemNote;
   original: Fields;
   comments: boolean;
   editable: boolean;
+  /** Shown first in the item's action row, as Findings' "Fix this". */
+  leading?: React.ReactNode;
   onChange(note: ItemNote): void;
 }) {
   const { theme, answer, superseded } = useUiRuntime();
@@ -104,29 +108,31 @@ function ItemFeedback({
     );
   }
 
+  const startComment = () => {
+    setDraft(note.comment ?? "");
+    setMode("comment");
+  };
   return (
-    <View style={{ gap: 4 }}>
+    <View style={{ gap: 6 }}>
       {note.comment ? (
         <View style={{ flexDirection: "row", gap: 6, alignItems: "flex-start" }}>
           <View style={{ paddingTop: 2 }}>
             <Icon name="MessageSquare" size={12} color={theme.colors.foregroundMuted} />
           </View>
-          <Text style={{ color: theme.colors.foreground, fontSize: 12, flex: 1 }}>{note.comment}</Text>
+          <Pressable disabled={!open} onPress={startComment} style={{ flex: 1 }}>
+            <Text style={{ color: theme.colors.foreground, fontSize: 12 }}>{note.comment}</Text>
+          </Pressable>
+          {open ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Remove comment" onPress={() => onChange({ ...note, comment: undefined })}>
+              <Icon name="Trash2" size={12} color={theme.colors.foregroundMuted} />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
       {open ? (
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          {comments ? (
-            <QuietAction
-              icon="MessageSquare"
-              label={note.comment ? "Edit comment" : "Comment"}
-              onPress={() => {
-                setDraft(note.comment ?? "");
-                setMode("comment");
-              }}
-            />
-          ) : null}
-          {comments && note.comment ? <QuietAction label="Remove comment" onPress={() => onChange({ ...note, comment: undefined })} /> : null}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+          {leading}
+          {comments && !note.comment ? <QuietAction icon="MessageSquare" label="Comment" onPress={startComment} /> : null}
           {editable ? (
             <QuietAction
               icon="Edit"
@@ -139,7 +145,9 @@ function ItemFeedback({
           ) : null}
           {editable && edited ? <QuietAction label="Undo edit" onPress={() => onChange({ ...note, edits: undefined })} /> : null}
         </View>
-      ) : null}
+      ) : (
+        leading
+      )}
     </View>
   );
 }
@@ -238,9 +246,10 @@ export function Other({ props }: { props: Props }) {
 
   if (answer || superseded) return null;
 
+  // Open or queued, the box takes the whole line of its button group.
   if (queued !== null && !open) {
     return (
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+      <View style={{ width: "100%", flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
         <View style={{ paddingTop: 2 }}>
           <Icon name="MessageSquare" size={12} color={theme.colors.foregroundMuted} />
         </View>
@@ -279,7 +288,7 @@ export function Other({ props }: { props: Props }) {
 
   const text = draft.trim();
   return (
-    <View style={{ gap: 6, alignSelf: "stretch" }}>
+    <View style={{ width: "100%", gap: 6 }}>
       <TextInput
         value={draft}
         multiline

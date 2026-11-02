@@ -96,7 +96,7 @@ export async function renderReplyMarkdown(text: string, load: Loader, find?: Ima
 }
 
 /** What is wrong with a spec: compile errors, files that failed to load, and evaluation errors. Empty when it renders cleanly. */
-async function specProblems(spec: string, load: Loader): Promise<{ problems: string[]; roots: UiNode[] | null }> {
+export async function specProblems(spec: string, load: Loader): Promise<{ problems: string[]; roots: UiNode[] | null }> {
   const compiled = compile(spec);
   if (compiled.program === null) {
     return { problems: [`The block does not compile:\n${formatDiagnostics(compiled.diagnostics)}`], roots: null };

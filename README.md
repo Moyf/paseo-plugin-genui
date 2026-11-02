@@ -2,6 +2,8 @@
 
 **Agents answer with charts, diagrams, maps, plans, and forms rendered inline in the Paseo chat timeline.**
 
+![A Kyoto route on a Map with metrics and reply buttons in Paseo chat](assets/screenshot-map.png)
+
 ![A Plan with a comment, a queued choice and the reply pill in Paseo chat](assets/screenshot-chat.png)
 
 ![Gen-UI Gallery with 88 components and 176 live examples](assets/screenshot-gallery.png)

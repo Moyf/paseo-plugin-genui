@@ -22,11 +22,13 @@ Or from npm:
 paseo plugin add npm:paseo-plugin-genui
 ```
 
-Requires Paseo 0.11.2 or later.
+Requires Paseo 0.14.0 or later.
 
 ## What an answer looks like
 
-The agent writes a ```ui block in its reply:
+The agent passes a UI spec to its `render_ui` tool. The plugin checks the spec first and adds the card to the chat only when it renders; otherwise the tool returns the errors and the agent fixes them in the same turn. Agents without the tool write the same spec as a ```ui block in their reply, and the plugin asks them once to fix a block that fails.
+
+A spec looks like this:
 
 ~~~
 ```ui
@@ -42,6 +44,10 @@ Card("Estimate", [
 ~~~
 
 Paseo renders a card with a plan switch, a seat slider, and a live total. Moving the slider recomputes the total in place without another model call. Clicking the button sends your choice back to the agent.
+
+## Replies you build
+
+Cards can collect a reply before anything is sent. A button with `Queue(text)` adds its text to your reply instead of sending it. `comments: true` adds a Comment action to each item of a Plan, Steps, List, Table, Findings, Decision or OptionCards, and `editable: true` lets you rewrite an item's text. `Other()` opens a box for anything the agent did not offer. A pill in the composer shows what is queued; the next Send, or Send now in the pill, sends it all as one message.
 
 ## Components (88 across 10 groups)
 

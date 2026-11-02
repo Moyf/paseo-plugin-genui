@@ -10,6 +10,7 @@ import {
   DESCRIPTIONS,
   EXPECTED,
   functionArg,
+  isUnknownComponentName,
   LAMBDA_METHODS,
   stateMismatch,
   type Kind,
@@ -305,6 +306,12 @@ const Interpreter = defineClass(
           if (action !== undefined) return this.action(expr, action, scope);
           const own = this.program.named.get(expr.name)?.value;
           if (own?.type === "arrow") return this.callOwn(expr, own, scope);
+          if (own === undefined && isUnknownComponentName(expr.name)) {
+            const key = `${expr.pos.line}:${expr.pos.column}${this.suffix}`;
+            const message = `\`${expr.name}\` is not a component`;
+            this.diagnostics.report(expr.pos, message);
+            return this.node("Error", key, { message }, expr.pos);
+          }
           return this.callFunction(expr, scope);
         }
         case "method":

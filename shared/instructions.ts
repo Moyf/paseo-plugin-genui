@@ -33,7 +33,7 @@ Games, simulations, custom visuals: write \`\`\`app, a self-contained HTML page 
 
 export const UI_REFERENCE_MORE = `# Inline UI reference, continued
 ${componentLines(REFERENCE_MORE_GROUPS)}
-Icon names: Check X Plus Minus Edit Copy Trash2 Download ExternalLink Play Pause RotateCcw Search Settings GitBranch GitMerge GitPullRequest Bug Code Terminal FileText Folder Clock Calendar Mail Sent Lock Star Pin Link Eye AlertTriangle Info Globe Smartphone Laptop Cloud Layers Puzzle.`;
+Icon names (strings, as in icon: "git-branch"): check x plus minus edit copy trash-2 download external-link play pause rotate-ccw search settings git-branch git-merge git-pull-request bug code terminal file-text folder clock calendar mail sent lock star pin link eye alert-triangle info globe smartphone laptop cloud layers puzzle.`;
 
 const MAP_EXAMPLE = `\`\`\`ui
 Card("Day 1", [Map([{name: "Belém Tower, Lisbon", note: "Opens 9:30"}, {name: "Pena Palace, Sintra"}], route: true)])

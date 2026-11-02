@@ -95,15 +95,11 @@ export async function renderReplyMarkdown(text: string, load: Loader, find?: Ima
   return output.join("\n");
 }
 
-export async function checkSpec(
-  spec: string,
-  load: Loader,
-  find?: ImageFinder,
-  project?: ProjectReader,
-): Promise<{ readonly ok: boolean; readonly report: string }> {
+/** What is wrong with a spec: compile errors, files that failed to load, and evaluation errors. Empty when it renders cleanly. */
+async function specProblems(spec: string, load: Loader): Promise<{ problems: string[]; roots: UiNode[] | null }> {
   const compiled = compile(spec);
   if (compiled.program === null) {
-    return { ok: false, report: `The block does not compile:\n${formatDiagnostics(compiled.diagnostics)}` };
+    return { problems: [`The block does not compile:\n${formatDiagnostics(compiled.diagnostics)}`], roots: null };
   }
   const requests = collectLoads(compiled.program);
   const loaded = await Promise.all(requests.map(async (request) => [request, await load(request)] as const));
@@ -113,8 +109,37 @@ export async function checkSpec(
     ...loaded.flatMap(([request, result]) => (result.ok ? [] : [`${request.path}: ${result.error}`])),
     ...(diagnostics.length > 0 ? [formatDiagnostics(diagnostics)] : []),
   ];
+  return { problems, roots };
+}
+
+export async function checkSpec(
+  spec: string,
+  load: Loader,
+  find?: ImageFinder,
+  project?: ProjectReader,
+): Promise<{ readonly ok: boolean; readonly report: string }> {
+  const { problems, roots } = await specProblems(spec, load);
+  if (roots === null) return { ok: false, report: problems[0] };
   const preview = `Text version of what the user will see:\n\n${await rootsMarkdown(roots, find, project)}`;
   return problems.length === 0
     ? { ok: true, report: `No errors. ${preview}` }
     : { ok: false, report: `Fix before replying:\n${problems.join("\n")}\n\n${preview}` };
+}
+
+export const REPAIR_MARKER = "[genui]";
+
+/** The follow-up that asks the agent to rewrite the ```ui blocks of `reply` that fail, or null when they all render. */
+export async function repairRequest(reply: string, load: Loader): Promise<string | null> {
+  const fences = findFences(reply.split("\n")).filter((fence) => fence.language === "ui" && fence.closed);
+  const failures: string[] = [];
+  for (const [index, fence] of fences.entries()) {
+    const { problems } = await specProblems(fence.body, load);
+    if (problems.length > 0) failures.push(`Block ${index + 1}:\n${problems.join("\n")}`);
+  }
+  if (failures.length === 0) return null;
+  return [
+    `${REPAIR_MARKER} Your last reply has \`\`\`ui blocks the user sees as errors:`,
+    ...failures,
+    "Send the corrected blocks only, using components from the Inline UI reference. Do not explain the fix.",
+  ].join("\n\n");
 }

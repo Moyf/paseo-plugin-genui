@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { checkSpec, renderReplyMarkdown } from "./shared/fallback";
+import { checkSpec, renderReplyMarkdown, repairRequest, REPAIR_MARKER } from "./shared/fallback";
 import { buildFullInstructions, GENUI_MARKER } from "./shared/instructions";
 import {
   appendDemoRpc,
@@ -107,6 +107,26 @@ export default function contribute(server: PluginServerContext) {
         systemPrompt: [existing, buildFullInstructions(webOn, extraFolders)].filter(Boolean).join("\n\n"),
       },
     };
+  });
+
+  // A ```ui block that fails shows the user an error box. Send the errors back so the
+  // agent rewrites the block; one attempt per user message, so a failed fix cannot loop.
+  server.on("agent.turn_ended", async (event, { paseo }) => {
+    if (event.outcome.kind !== "completed" || event.agent.parentAgentId) return;
+    const current = await settings.read();
+    if (current.status === "ready" && !current.values.autoInstructions) return;
+    const agent = paseo.agents.ref(event.agent.id);
+    const page = await agent.timeline.refetch({ direction: "tail", limit: 40 });
+    if (page.error) return;
+    const items = page.entries.map((entry) => entry.item);
+    const lastUser = items.findLastIndex((item) => item.type === "user_message");
+    if (lastUser >= 0 && items[lastUser].type === "user_message" && items[lastUser].text.startsWith(REPAIR_MARKER)) return;
+    const reply = items
+      .slice(lastUser + 1)
+      .flatMap((item) => (item.type === "assistant_message" ? [item.text] : []))
+      .join("\n\n");
+    const request = await repairRequest(reply, (req) => loadAgentFile(paseo, event.agent.id, req.path, req));
+    if (request !== null) await agent.send(request);
   });
 
   server.before("agent.session_open", async ({ request }) => {

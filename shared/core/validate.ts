@@ -66,6 +66,11 @@ const FUNCTION_ARITY: ReadonlyMap<string, Arity> = new Map(
   } satisfies Record<FunctionName, Arity>),
 );
 
+/** A capitalized call the catalog lacks, as in `Link(url)`: it renders as an Error node instead of failing the block. */
+export function isUnknownComponentName(name: string): boolean {
+  return /^[A-Z][A-Za-z0-9]*$/.test(name) && !COMPONENT_SPECS.has(name) && !ACTION_SPECS.has(name) && !FUNCTION_ARITY.has(name);
+}
+
 const ACTION_LIST = [...ACTION_SPECS].map(([name, spec]) => signature(name, spec)).join(", ");
 const ARROW_ONLY =
   "arrow functions can only be declared as a named function (`share = p => ...`) or passed to a list method such as map, filter, reduce or sort";
@@ -581,7 +586,9 @@ const Validator = defineClass(
       } else {
         const arity = FUNCTION_ARITY.get(expr.name);
         if (arity === undefined) {
-          this.diagnostics.report(expr.pos, this.unknownCallee(expr.name, params));
+          // An unknown component renders as an inline Error node, so the rest of the block still shows.
+          const component = this.unknownComponent(expr.name, params);
+          this.diagnostics.report(expr.pos, this.unknownCallee(expr.name, params), component ? "warning" : "error");
         } else {
           if (expr.named.length > 0) {
             this.diagnostics.report(expr.named[0].pos, `\`${expr.name}\` takes positional arguments only`);
@@ -595,6 +602,10 @@ const Validator = defineClass(
       }
       for (const arg of expr.args) this.check(arg, params, refs);
       for (const arg of expr.named) this.check(arg.value, params, refs);
+    },
+
+    unknownComponent(name: string, params: readonly string[]): boolean {
+      return isUnknownComponentName(name) && !this.named.has(name) && !params.includes(name) && !this.states.has(name);
     },
 
     unknownCallee(name: string, params: readonly string[]): string {

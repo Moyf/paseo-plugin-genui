@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import type { PluginHookContext, PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { checkSpec, renderReplyMarkdown, repairRequest, REPAIR_MARKER } from "./shared/fallback";
 import { buildFullInstructions, GENUI_MARKER } from "./shared/instructions";
 import {
@@ -33,7 +33,6 @@ import { genuiSettings, parseFolders } from "./shared/settings";
 import {
   agentStorageDir,
   examplesReport,
-  packagePath,
   listGallery,
   loadAgentAudio,
   loadAgentFile,
@@ -55,7 +54,7 @@ import {
   readProjectPullRequest,
   readProjectThreads,
 } from "./server/project";
-import { renderEndpointFile, startRenderEndpoint } from "./server/render-endpoint";
+import { renderUiTool } from "./server/render-tool";
 import { createWebLookups } from "./server/web/lookups";
 
 const DEFAULT_DEMO_SPEC = `$seats = 10
@@ -95,11 +94,7 @@ export default function contribute(server: PluginServerContext) {
     return found.ok ? found.image : null;
   };
 
-  let paseoApi: PluginHookContext["paseo"] | null = null;
-  const renderEndpoint = startRenderEndpoint(() => paseoApi);
-
-  server.before("agent.create", async ({ request }, { paseo }) => {
-    paseoApi = paseo;
+  server.before("agent.create", async ({ request }) => {
     const current = await settings.read();
     if (current.status === "ready" && !current.values.autoInstructions) return;
     const webOn = current.status === "ready" ? current.values.webLookups : true;
@@ -111,13 +106,6 @@ export default function contribute(server: PluginServerContext) {
       config: {
         ...request.config,
         systemPrompt: [existing, buildFullInstructions(webOn, extraFolders)].filter(Boolean).join("\n\n"),
-        mcpServers: {
-          ...request.config.mcpServers,
-          genui: { type: "stdio", command: process.execPath, args: [packagePath("server", "render-ui-mcp.mjs"), renderEndpointFile()], alwaysLoad: true },
-        },
-        toolPolicy: {
-          preapproved: [...(request.config.toolPolicy?.preapproved ?? []), { kind: "mcp", server: "genui", tool: "render_ui" }],
-        },
       },
     };
   });
@@ -142,12 +130,20 @@ export default function contribute(server: PluginServerContext) {
     if (request !== null) await agent.send(request);
   });
 
-  server.before("agent.session_open", async ({ request }, { paseo }) => {
-    paseoApi = paseo;
+  // render_ui only reads files the plugin may already read and adds UI to the chat, so it needs no prompt.
+  server.on("agent.permission_requested", async ({ agent, request }, { paseo }) => {
+    if (!/^(mcp__paseo__|paseo\.)render_ui$/.test(request.name)) return;
+    await paseo.agents.ref(agent.id).respondToPermission({ requestId: request.id, response: { behavior: "allow" } });
+  });
+
+  server.before("agent.session_open", async ({ request }) => {
+    const current = await settings.read();
+    const renderTool = current.status !== "ready" || current.values.autoInstructions;
     const storageDir = agentStorageDir(request.agentId);
     await mkdir(storageDir, { recursive: true }).catch(() => undefined);
     return {
       ...request,
+      tools: renderTool ? [...request.tools, renderUiTool] : request.tools,
       env: {
         ...request.env,
         BB_THREAD_STORAGE: storageDir,
@@ -251,7 +247,6 @@ export default function contribute(server: PluginServerContext) {
   });
 
   return () => {
-    void renderEndpoint.then((endpoint) => endpoint.close());
     unsubscribeSettings();
   };
 }

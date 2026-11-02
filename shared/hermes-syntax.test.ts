@@ -37,5 +37,5 @@ describe("Hermes compatibility", () => {
       path.join(root, "index.client.tsx"),
     ];
     expect(files.flatMap(classesIn)).toEqual([]);
-  });
+  }, 30_000); // Parsing every file takes ~5 s under a full parallel run, past vitest's 5 s default.
 });

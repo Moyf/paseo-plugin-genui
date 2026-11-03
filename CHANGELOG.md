@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Render `==highlighted text==` in GenUI Markdown with a translucent theme-colored background. Keep nested emphasis and links, inherited text colors, and literal delimiters in code and escaped text.
+
 ## 0.3.4-moy.1
 
 - Restore session creation, history reads, and resume with shared OpenCode v2 services in Paseo 0.15 by keeping GenUI thread storage out of provider process environment overrides.

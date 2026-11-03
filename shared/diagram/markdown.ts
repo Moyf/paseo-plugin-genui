@@ -3,16 +3,17 @@
  *
  * Taking over a timeline item means taking over its text too, so this exists to
  * keep that text readable. It covers what agents actually write around a
- * diagram: headings, paragraphs, lists, code and inline emphasis. Anything else
- * survives as plain text rather than as broken markup.
+ * diagram: headings, paragraphs, lists, code, inline emphasis and highlights.
+ * Anything else survives as plain text rather than as broken markup.
  */
 
 export type Inline =
   | { kind: "text"; text: string }
-  | { kind: "bold"; text: string }
-  | { kind: "italic"; text: string }
+  | { kind: "bold"; content: Inline[] }
+  | { kind: "italic"; content: Inline[] }
+  | { kind: "highlight"; content: Inline[] }
   | { kind: "code"; text: string }
-  | { kind: "link"; text: string; url: string };
+  | { kind: "link"; content: Inline[]; url: string };
 
 export type Block =
   | { kind: "heading"; level: number; content: Inline[] }
@@ -23,45 +24,94 @@ export type Block =
   | { kind: "quote"; content: Inline[] }
   | { kind: "rule" };
 
-// A bare URL drops trailing punctuation, so "see https://x.dev." links to https://x.dev.
-const INLINE =
-  /(`[^`]+`|\[[^\]\n]+\]\([^)\s]+\)|https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]*_]|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_)/;
+const CODE = /(`+)(?!`)([\s\S]*?[^`])\1(?!`)/;
+const ESCAPE = /\\[\\`*_=]/;
 const LINK = /^\[([^\]\n]+)\]\(([^)\s]+)\)$/;
+// A bare URL drops trailing punctuation, so "see https://x.dev." links to https://x.dev.
+const INLINE = new RegExp(
+  `${CODE.source}|${ESCAPE.source}|${LINK.source.slice(1, -1)}|` +
+    String.raw`https?:\/\/[^\s<>]*[^\s<>.,;:!?'"\)\]*_]|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_|==`,
+  "g",
+);
+// A delimiter inside code or a link target does not close the surrounding highlight.
+const HIGHLIGHT_TOKEN = new RegExp(
+  `${CODE.source}|${ESCAPE.source}|${LINK.source.slice(1, -1)}|==`,
+  "g",
+);
 
 const WORD_CHAR = /[A-Za-z0-9]/;
 
 /** `_x_` inside a word, as in review_gate_per_project, is not emphasis (CommonMark's rule). */
-function intraword(pieces: readonly string[], index: number): boolean {
-  const before = pieces[index - 1] ?? "";
-  const after = pieces[index + 1] ?? "";
-  return WORD_CHAR.test(before.slice(-1)) || WORD_CHAR.test(after.slice(0, 1));
+function intraword(text: string, start: number, length: number): boolean {
+  return (
+    WORD_CHAR.test(text.slice(start - 1, start)) ||
+    WORD_CHAR.test(text.slice(start + length, start + length + 1))
+  );
 }
 
-export function parseInline(text: string): Inline[] {
-  const out: Inline[] = [];
-  const pieces = text.split(INLINE);
-  for (const [index, piece] of pieces.entries()) {
-    if (piece.length === 0) continue;
-    if (piece.startsWith("_") && piece.endsWith("_") && intraword(pieces, index)) {
-      out.push({ kind: "text", text: piece });
-      continue;
-    }
-    const link = LINK.exec(piece);
-    if (piece.startsWith("`") && piece.endsWith("`") && piece.length > 1) {
-      out.push({ kind: "code", text: piece.slice(1, -1) });
-    } else if (link) {
-      // Only web and mail links open; any other scheme (javascript:, file:) shows as its text.
-      out.push(/^(https?:|mailto:)/i.test(link[2]) ? { kind: "link", text: link[1], url: link[2] } : { kind: "text", text: link[1] });
-    } else if (/^https?:\/\//.test(piece)) {
-      out.push({ kind: "link", text: piece, url: piece });
-    } else if ((piece.startsWith("**") && piece.endsWith("**")) || (piece.startsWith("__") && piece.endsWith("__"))) {
-      out.push({ kind: "bold", text: piece.slice(2, -2) });
-    } else if ((piece.startsWith("*") && piece.endsWith("*")) || (piece.startsWith("_") && piece.endsWith("_"))) {
-      out.push({ kind: "italic", text: piece.slice(1, -1) });
-    } else {
-      out.push({ kind: "text", text: piece });
-    }
+function delimiter(text: string, index: number): boolean {
+  return text[index - 1] !== "=" && text[index + 2] !== "=";
+}
+
+function highlightEnd(text: string, start: number): number {
+  if (!delimiter(text, start) || !/\S/.test(text[start + 2] ?? "")) return -1;
+  const newline = text.indexOf("\n", start);
+  const rest = text.slice(start + 2, newline < 0 ? text.length : newline);
+  for (const match of rest.matchAll(HIGHLIGHT_TOKEN)) {
+    const end = start + 2 + match.index;
+    if (match[0] === "==" && delimiter(text, end) && /\S/.test(text[end - 1])) return end;
   }
+  return -1;
+}
+
+function inlineToken(piece: string, source: string, start: number, allowLinks: boolean): Inline {
+  if (piece.startsWith("\\")) return { kind: "text", text: piece.slice(1) };
+  const ticks = /^`+/.exec(piece)?.[0];
+  if (ticks) return { kind: "code", text: piece.slice(ticks.length, -ticks.length) };
+  if (piece.startsWith("_") && intraword(source, start, piece.length))
+    return { kind: "text", text: piece };
+  const link = LINK.exec(piece);
+  if (link) {
+    // Only web and mail links open; any other scheme shows as its text.
+    return allowLinks && /^(https?:|mailto:)/i.test(link[2])
+      ? { kind: "link", content: parseInline(link[1], false), url: link[2] }
+      : { kind: "text", text: link[1] };
+  }
+  if (/^https?:\/\//.test(piece))
+    return allowLinks
+      ? { kind: "link", content: [{ kind: "text", text: piece }], url: piece }
+      : { kind: "text", text: piece };
+  const bold = piece.startsWith("**") || piece.startsWith("__");
+  return {
+    kind: bold ? "bold" : "italic",
+    content: parseInline(piece.slice(bold ? 2 : 1, bold ? -2 : -1), allowLinks),
+  };
+}
+
+function appendInline(out: Inline[], span: Inline): void {
+  const last = out.at(-1);
+  if (last?.kind === "text" && span.kind === "text") last.text += span.text;
+  else out.push(span);
+}
+
+export function parseInline(text: string, allowLinks = true): Inline[] {
+  const out: Inline[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(INLINE)) {
+    if (match.index < cursor) continue;
+    if (match.index > cursor)
+      appendInline(out, { kind: "text", text: text.slice(cursor, match.index) });
+    cursor = match.index + match[0].length;
+    if (match[0] === "==") {
+      const end = highlightEnd(text, match.index);
+      if (end < 0) appendInline(out, { kind: "text", text: "==" });
+      else {
+        out.push({ kind: "highlight", content: parseInline(text.slice(cursor, end), allowLinks) });
+        cursor = end + 2;
+      }
+    } else appendInline(out, inlineToken(match[0], text, match.index, allowLinks));
+  }
+  if (cursor < text.length) appendInline(out, { kind: "text", text: text.slice(cursor) });
   return out;
 }
 

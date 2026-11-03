@@ -47,6 +47,8 @@ Card("Estimate", [
 
 Paseo renders a card with a plan switch, a seat slider, and a live total. Moving the slider recomputes the total in place without another model call. Clicking the button sends your choice back to the agent.
 
+GenUI Markdown supports `==highlighted text==`, including nested emphasis such as `==**important** text==`. Text and Callout bodies, Draft previews, and other Markdown details use the same theme-colored highlight. Code spans and code blocks keep `==` literal.
+
 ## Replies you build
 
 Cards can collect a reply before anything is sent. A button with `Queue(text)` adds its text to your reply instead of sending it. `comments: true` adds a Comment action to each item of a Plan, Steps, List, Table, Findings, Decision or OptionCards, and `editable: true` lets you rewrite an item's text. `Other()` opens a box for anything the agent did not offer. A pill in the composer shows what is queued; the next Send, or Send now in the pill, sends it all as one message.

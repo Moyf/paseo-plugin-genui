@@ -25,21 +25,13 @@ export function MarkdownText({
   );
 }
 
-/** One line of inline Markdown (links, emphasis, code), nested inside a caller's styled Text. */
+/** One line of inline Markdown, nested inside a caller's styled Text. */
 export function InlineMarkdown({ text, theme }: { text: string; theme: PluginTheme }) {
   const content = useMemo(() => parseInline(text), [text]);
   return <Spans content={content} theme={theme} />;
 }
 
-function BlockView({
-  block,
-  theme,
-  color,
-}: {
-  block: Block;
-  theme: PluginTheme;
-  color?: string;
-}) {
+function BlockView({ block, theme, color }: { block: Block; theme: PluginTheme; color?: string }) {
   const body = {
     color: color ?? theme.colors.foreground,
     fontSize: 13.5,
@@ -101,9 +93,7 @@ function BlockView({
 
   if (block.kind === "quote") {
     return (
-      <View
-        style={{ paddingLeft: 12 }}
-      >
+      <View style={{ paddingLeft: 12 }}>
         <Text selectable style={{ ...body, color: theme.colors.foregroundMuted }}>
           <Spans content={block.content} theme={theme} />
         </Text>
@@ -142,14 +132,21 @@ function Spans({ content, theme }: { content: Inline[]; theme: PluginTheme }) {
         if (span.kind === "bold") {
           return (
             <Text key={index} style={{ fontWeight: "700" }}>
-              {span.text}
+              <Spans content={span.content} theme={theme} />
             </Text>
           );
         }
         if (span.kind === "italic") {
           return (
             <Text key={index} style={{ fontStyle: "italic" }}>
-              {span.text}
+              <Spans content={span.content} theme={theme} />
+            </Text>
+          );
+        }
+        if (span.kind === "highlight") {
+          return (
+            <Text key={index} style={{ backgroundColor: `${theme.colors.statusWarning}33` }}>
+              <Spans content={span.content} theme={theme} />
             </Text>
           );
         }
@@ -176,7 +173,7 @@ function Spans({ content, theme }: { content: Inline[]; theme: PluginTheme }) {
               onPress={() => void openExternalUrl(span.url)}
               style={{ color: theme.colors.accent, textDecorationLine: "underline" }}
             >
-              {span.text}
+              <Spans content={span.content} theme={theme} />
             </Text>
           );
         }

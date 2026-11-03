@@ -1,21 +1,13 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import React from "react";
-import { buildFullInstructions } from "./shared/instructions";
 import {
+  agentInstructionsRpc,
   appendDemoRpc,
   genuiBlockDataSchema,
   genuiTextDataSchema,
 } from "./shared/rpc";
-import {
-  GENUI_BLOCK_KIND,
-  GENUI_TEXT_KIND,
-  splitTimelineMessage,
-} from "./shared/segment";
-import {
-  GalleryScreen,
-  GallerySidebarItem,
-  GalleryWorkspacePanel,
-} from "./client/gallery";
+import { GENUI_BLOCK_KIND, GENUI_TEXT_KIND, splitTimelineMessage } from "./shared/segment";
+import { GalleryScreen, GallerySidebarItem, GalleryWorkspacePanel } from "./client/gallery";
 import { TimelineBlockItem, TimelineTextItem } from "./client/live-ui";
 import { registerQueuePills } from "./client/queue-pill";
 import { GenUiSettingsScreen } from "./client/settings";
@@ -88,10 +80,11 @@ export default function contribute(client: PluginClientContext) {
     description: "Enable Generative UI inline components for this agent",
     argumentHint: "[prompt]",
     context: "agent",
-    async onSubmit({ args, paseo, agent }) {
+    async onSubmit({ args, paseo, rpc, agent }) {
+      const { instructions } = await rpc(agentInstructionsRpc, { agentId: agent.id });
       const prompt = args.trim()
-        ? `${buildFullInstructions(true)}\n\n${args.trim()}`
-        : `${buildFullInstructions(true)}\n\nAcknowledge briefly and use \`\`\`ui blocks in your replies from now on.`;
+        ? `${instructions}\n\n${args.trim()}`
+        : `${instructions}\n\nAcknowledge briefly and use \`\`\`ui blocks in your replies from now on.`;
       await paseo.agents.ref(agent.id).send(prompt);
     },
   });

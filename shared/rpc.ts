@@ -39,6 +39,12 @@ const filePath = z.string().min(1).max(1024);
 const agentIdSchema = z.string().min(1).max(128);
 const blockKeySchema = z.string().min(1).max(512).nullable();
 
+export const agentInstructionsRpc = defineRpc({
+  name: "genui.agent_instructions",
+  input: z.object({ agentId: agentIdSchema }),
+  output: z.object({ instructions: z.string() }),
+});
+
 const loadedDataSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), value: z.custom<Value>() }),
   z.object({ ok: z.literal(false), error: z.string() }),

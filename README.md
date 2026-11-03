@@ -1,5 +1,7 @@
 # Generative UI for Paseo
 
+This fork fixes thread storage compatibility with shared OpenCode v2 services in Paseo 0.15. The upstream project is [anh-chu/paseo-plugin-genui](https://github.com/anh-chu/paseo-plugin-genui).
+
 **Agents answer with charts, diagrams, maps, plans, and forms rendered inline in the Paseo chat timeline.**
 
 ![A Kyoto route on a Map with metrics and reply buttons in Paseo chat](assets/screenshot-map.png)
@@ -15,16 +17,14 @@ Ported from [ComicBit/bb-plugin-genui](https://github.com/ComicBit/bb-plugin-gen
 ## Install
 
 ```bash
-paseo plugin add git:anh-chu/paseo-plugin-genui
+paseo plugin add git:Moyf/paseo-plugin-genui
 ```
 
-Or from npm:
-
-```bash
-paseo plugin add npm:paseo-plugin-genui
-```
+The upstream npm package does not include this fork's fix.
 
 Requires Paseo 0.14.0 or later.
+
+GenUI's instructions describe the absolute thread storage directory to use in shell commands. `$BB_THREAD_STORAGE` and `$PASEO_THREAD_STORAGE` remain aliases inside `Load`, `Snippet`, and `Image`; they are no longer exported as shell environment variables. After updating this plugin, run `/genui` once in an existing agent to refresh its instructions and get its exact storage directory. New agents receive storage guidance when created. No daemon restart is needed to load a plugin update.
 
 ## What an answer looks like
 
@@ -32,7 +32,7 @@ The agent writes a UI spec as a ```ui block in its reply, after a plain answer s
 
 A spec looks like this:
 
-~~~
+````
 ```ui
 $seats = 12
 $plan = "Pro"
@@ -43,7 +43,7 @@ Card("Estimate", [
   Button("Go with " + $plan, Send("Go with " + $plan), variant: "primary")
 ])
 ```
-~~~
+````
 
 Paseo renders a card with a plan switch, a seat slider, and a live total. Moving the slider recomputes the total in place without another model call. Clicking the button sends your choice back to the agent.
 
@@ -53,18 +53,18 @@ Cards can collect a reply before anything is sent. A button with `Queue(text)` a
 
 ## Components (88 across 10 groups)
 
-| Group | Components |
-| --- | --- |
-| **Layout** | `Card` · `Row` · `Stack` · `Grid` · `Tabs` · `Details` · `Divider` · `Carousel` |
-| **Content** | `Text` · `Callout` · `Draft` · `Metric` · `Badge` · `Icon` · `KeyValue` · `Image` · `File` · `Entity` · `Sources` · `List` |
-| **Data** | `Table` · `Chart` (bar, line, area, pie, scatter, radar, funnel, heatmap) · `Sparkline` · `Progress` · `Gauge` · `SegmentedBar` · `Steps` · `Timeline` · `Calendar` · `CalendarHeatmap` · `Tree` · `Code` · `Snippet` · `Diff` · `Diagram` |
-| **Media** | `ImageSearch` · `Gallery` · `Map` · `Hotspots` |
-| **Inputs** | `Slider` · `Stepper` · `Toggle` · `Choice` · `Radio` · `Select` · `Checklist` · `ListEditor` · `Input` · `TextArea` · `DateInput` · `Rating` · `OptionCards` · `Swatches` · `EditableTable` · `Button` · `Form` · `FollowUps` · `Other` |
-| **Widgets** | `Timer` · `Quiz` · `Flashcards` · `Walkthrough` |
-| **Project** | `Changes` · `Commits` · `PullRequest` · `Threads` · `Tests` · `Json` |
-| **Dev** | `Logs` · `StackTrace` · `Findings` · `Coverage` · `Dependencies` · `Pipeline` · `Benchmark` · `Waterfall` · `Treemap` |
-| **Manage** | `Board` · `Roadmap` · `Status` · `Plan` · `Decision` · `Estimate` · `Environments` |
-| **Evidence** | `Acceptance` · `Compare` · `Transcript` · `Provenance` |
+| Group        | Components                                                                                                                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Layout**   | `Card` · `Row` · `Stack` · `Grid` · `Tabs` · `Details` · `Divider` · `Carousel`                                                                                                                                                            |
+| **Content**  | `Text` · `Callout` · `Draft` · `Metric` · `Badge` · `Icon` · `KeyValue` · `Image` · `File` · `Entity` · `Sources` · `List`                                                                                                                 |
+| **Data**     | `Table` · `Chart` (bar, line, area, pie, scatter, radar, funnel, heatmap) · `Sparkline` · `Progress` · `Gauge` · `SegmentedBar` · `Steps` · `Timeline` · `Calendar` · `CalendarHeatmap` · `Tree` · `Code` · `Snippet` · `Diff` · `Diagram` |
+| **Media**    | `ImageSearch` · `Gallery` · `Map` · `Hotspots`                                                                                                                                                                                             |
+| **Inputs**   | `Slider` · `Stepper` · `Toggle` · `Choice` · `Radio` · `Select` · `Checklist` · `ListEditor` · `Input` · `TextArea` · `DateInput` · `Rating` · `OptionCards` · `Swatches` · `EditableTable` · `Button` · `Form` · `FollowUps` · `Other`    |
+| **Widgets**  | `Timer` · `Quiz` · `Flashcards` · `Walkthrough`                                                                                                                                                                                            |
+| **Project**  | `Changes` · `Commits` · `PullRequest` · `Threads` · `Tests` · `Json`                                                                                                                                                                       |
+| **Dev**      | `Logs` · `StackTrace` · `Findings` · `Coverage` · `Dependencies` · `Pipeline` · `Benchmark` · `Waterfall` · `Treemap`                                                                                                                      |
+| **Manage**   | `Board` · `Roadmap` · `Status` · `Plan` · `Decision` · `Estimate` · `Environments`                                                                                                                                                         |
+| **Evidence** | `Acceptance` · `Compare` · `Transcript` · `Provenance`                                                                                                                                                                                     |
 
 ## Slash commands & surfaces
 

@@ -1,8 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { checkSpec, renderReplyMarkdown, repairRequest, REPAIR_MARKER } from "./shared/fallback";
-import { buildFullInstructions, GENUI_MARKER } from "./shared/instructions";
+import { GENUI_MARKER } from "./shared/instructions";
 import {
+  agentInstructionsRpc,
   appendDemoRpc,
   checkUiRpc,
   galleryAudioRpc,
@@ -55,6 +56,7 @@ import {
   readProjectThreads,
 } from "./server/project";
 import { renderUiTool } from "./server/render-tool";
+import { buildAgentInstructions } from "./server/instructions";
 import { createWebLookups } from "./server/web/lookups";
 
 const DEFAULT_DEMO_SPEC = `$seats = 10
@@ -98,14 +100,17 @@ export default function contribute(server: PluginServerContext) {
     const current = await settings.read();
     if (current.status === "ready" && !current.values.autoInstructions) return;
     const webOn = current.status === "ready" ? current.values.webLookups : true;
-    const extraFolders = current.status === "ready" ? parseFolders(current.values.extraFolders) : [];
+    const extraFolders =
+      current.status === "ready" ? parseFolders(current.values.extraFolders) : [];
     const existing = request.config.systemPrompt ?? "";
     if (existing.includes(GENUI_MARKER)) return;
     return {
       ...request,
       config: {
         ...request.config,
-        systemPrompt: [existing, buildFullInstructions(webOn, extraFolders)].filter(Boolean).join("\n\n"),
+        systemPrompt: [existing, buildAgentInstructions(webOn, extraFolders)]
+          .filter(Boolean)
+          .join("\n\n"),
       },
     };
   });
@@ -121,19 +126,28 @@ export default function contribute(server: PluginServerContext) {
     if (page.error) return;
     const items = page.entries.map((entry) => entry.item);
     const lastUser = items.findLastIndex((item) => item.type === "user_message");
-    if (lastUser >= 0 && items[lastUser].type === "user_message" && items[lastUser].text.startsWith(REPAIR_MARKER)) return;
+    if (
+      lastUser >= 0 &&
+      items[lastUser].type === "user_message" &&
+      items[lastUser].text.startsWith(REPAIR_MARKER)
+    )
+      return;
     const reply = items
       .slice(lastUser + 1)
       .flatMap((item) => (item.type === "assistant_message" ? [item.text] : []))
       .join("\n\n");
-    const request = await repairRequest(reply, (req) => loadAgentFile(paseo, event.agent.id, req.path, req));
+    const request = await repairRequest(reply, (req) =>
+      loadAgentFile(paseo, event.agent.id, req.path, req),
+    );
     if (request !== null) await agent.send(request);
   });
 
   // render_ui only reads files the plugin may already read and adds UI to the chat, so it needs no prompt.
   server.on("agent.permission_requested", async ({ agent, request }, { paseo }) => {
     if (!/^(mcp__paseo__|paseo\.)render_ui$/.test(request.name)) return;
-    await paseo.agents.ref(agent.id).respondToPermission({ requestId: request.id, response: { behavior: "allow" } });
+    await paseo.agents
+      .ref(agent.id)
+      .respondToPermission({ requestId: request.id, response: { behavior: "allow" } });
   });
 
   server.before("agent.session_open", async ({ request }) => {
@@ -144,12 +158,15 @@ export default function contribute(server: PluginServerContext) {
     return {
       ...request,
       tools: renderTool ? [...request.tools, renderUiTool] : request.tools,
-      env: {
-        ...request.env,
-        BB_THREAD_STORAGE: storageDir,
-        PASEO_THREAD_STORAGE: storageDir,
-      },
     };
+  });
+
+  server.handle(agentInstructionsRpc, async ({ agentId }) => {
+    const current = await settings.read();
+    const webOn = current.status === "ready" ? current.values.webLookups : true;
+    const extraFolders =
+      current.status === "ready" ? parseFolders(current.values.extraFolders) : [];
+    return { instructions: buildAgentInstructions(webOn, extraFolders, agentId) };
   });
 
   server.handle(loadDataRpc, ({ agentId, path, raw }, { paseo }) =>
@@ -201,9 +218,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(projectPatchesRpc, ({ agentId, target, paths }, { paseo }) =>
     readProjectPatches(paseo, agentId, target, paths),
   );
-  server.handle(projectCommitsRpc, ({ agentId }, { paseo }) =>
-    readProjectCommits(paseo, agentId),
-  );
+  server.handle(projectCommitsRpc, ({ agentId }, { paseo }) => readProjectCommits(paseo, agentId));
   server.handle(projectPullRequestRpc, ({ agentId }, { paseo }) =>
     readProjectPullRequest(paseo, agentId),
   );

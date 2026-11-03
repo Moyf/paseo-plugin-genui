@@ -20,7 +20,13 @@ const actionList = Object.entries(ACTIONS)
   .join(" ");
 
 export const REFERENCE_GROUPS: readonly ComponentGroup[] = ["Layout", "Content", "Data", "Project"];
-export const REFERENCE_MORE_GROUPS: readonly ComponentGroup[] = ["Inputs", "Widgets", "Media", "Dev", "Manage"];
+export const REFERENCE_MORE_GROUPS: readonly ComponentGroup[] = [
+  "Inputs",
+  "Widgets",
+  "Media",
+  "Dev",
+  "Manage",
+];
 
 export const UI_REFERENCE = `# Inline UI reference
 The \`\`\`ui language used by the Inline UI section below.
@@ -29,7 +35,7 @@ Components (? optional; tone: neutral|good|warn|bad|info if meaningful; more in 
 ${componentLines(REFERENCE_GROUPS)}
 Actions: ${actionList}; a list runs in order; Send posts as the user, together with anything queued.
 Replies the user builds: when a reply has several independent choices (across cards too), make each a Button with Queue and keep Send for the one that finishes the reply. comments: true lets the user comment on each item, and editable: true lets them rewrite an item's text, before replying; Other() gives a free-form box. Use them where the user may want to adjust what you propose. Plan, Decision, Findings and Form have their own send buttons; do not add another.
-Data: Load("path") reads JSON/CSV/TSV/JSONL from the workspace, "$BB_THREAD_STORAGE/x.json" or /tmp into lists and objects, and other files (a log, tsc output) as text; never retype values a file or command output holds. Snippet and Image read files the same way. Any other path fails to load: copy the file into $BB_THREAD_STORAGE first.
+Data: Load("path") reads JSON/CSV/TSV/JSONL from the workspace, "$BB_THREAD_STORAGE/x.json" or /tmp into lists and objects, and other files (a log, tsc output) as text; never retype values a file or command output holds. Snippet and Image read files the same way. Any other path fails to load: copy the file into the thread storage directory first.
 Games, simulations, custom visuals: write \`\`\`app, a self-contained HTML page (inline CSS/JS, CSS vars --foreground --muted-foreground --border --primary --card; sandboxed, no network).`;
 
 export const UI_REFERENCE_MORE = `# Inline UI reference, continued
@@ -41,12 +47,13 @@ Card("Day 1", [Map([{name: "Belém Tower, Lisbon", note: "Opens 9:30"}, {name: "
 \`\`\``;
 
 export const CODE_WORK_INSTRUCTIONS = `# Inline UI for code work
-Replies here are read in Paseo, which draws these components; pasted output, a markdown table or a plan in prose is the worse answer. Show what you ran with its component, from the file it saved (save as you run, in the format it reads, to $BB_THREAD_STORAGE or /tmp/opencode; /tmp reports load too); never paste or retype output. Tests or a build that fully passed need one sentence; coverage, timings, sizes, dependencies and findings always get their component.
-- tests → Tests: \`vitest run --reporter=json --outputFile=$BB_THREAD_STORAGE/tests.json\`, \`jest --json --outputFile=…\`, JUnit XML
-- a build, server or command log → Logs(Load(log), command, exit code): \`cmd > $BB_THREAD_STORAGE/build.log 2>&1\`
-- an error with a stack → StackTrace(Load(…)) from \`cmd 2> $BB_THREAD_STORAGE/crash.txt\`, or StackTrace(the error text)
+Replies here are read in Paseo, which draws these components; pasted output, a markdown table or a plan in prose is the worse answer. Show what you ran with its component, from the file it saved (save as you run, in the format it reads, to thread storage or /tmp/opencode; /tmp reports load too); never paste or retype output. Tests or a build that fully passed need one sentence; coverage, timings, sizes, dependencies and findings always get their component.
+Replace <thread-storage> in the shell examples below with the absolute directory described in Thread storage. $BB_THREAD_STORAGE and $PASEO_THREAD_STORAGE are aliases for Load, Snippet and Image, not exported shell variables. Files in the workspace can also use relative paths.
+- tests → Tests: \`vitest run --reporter=json --outputFile="<thread-storage>/tests.json"\`, \`jest --json --outputFile=…\`, JUnit XML
+- a build, server or command log → Logs(Load(log), command, exit code): \`cmd > "<thread-storage>/build.log" 2>&1\`
+- an error with a stack → StackTrace(Load(…)) from \`cmd 2> "<thread-storage>/crash.txt"\`, or StackTrace(the error text)
 - lint, type errors, a code review → Findings: \`eslint -f json\`, \`tsc --noEmit --pretty false\`, SARIF, \`ruff check --output-format json\`; a review as [{severity, title, file, line, detail, fix}]
-- coverage → Coverage(Load(…)): \`vitest run --coverage --coverage.reporter=lcov --coverage.reportsDirectory=$BB_THREAD_STORAGE/cov\`, then cov/lcov.info; or coverage-summary.json
+- coverage → Coverage(Load(…)): \`vitest run --coverage --coverage.reporter=lcov --coverage.reportsDirectory="<thread-storage>/cov"\`, then cov/lcov.info; or coverage-summary.json
 - outdated or vulnerable packages → Dependencies: \`npm outdated --json --long\`, \`npm audit --json\`, \`pip list --outdated --format=json\`
 - a CI run → Pipeline: \`gh run view <id> --json name,displayTitle,status,conclusion,event,headBranch,headSha,url,createdAt,updatedAt,jobs\`
 - timings you measured (before/after, A vs B) → Benchmark([{name, before, after, unit}]) or Load(\`hyperfine --export-json\`); a page load → Waterfall(Load(a HAR)); what takes space → Treemap(Load(\`du -k -d 2 <dir>\` or an esbuild metafile))
@@ -136,11 +143,18 @@ export const AGENT_INSTRUCTIONS_WEB_OFF = AGENT_INSTRUCTIONS.replace(MAP_EXAMPLE
 
 export const GENUI_MARKER = "[paseo-plugin-genui]";
 
-export function buildFullInstructions(webLookups: boolean, extraFolders: readonly string[] = []): string {
+export function buildFullInstructions(
+  webLookups: boolean,
+  extraFolders: readonly string[] = [],
+  threadStorage?: string,
+): string {
   return [
     GENUI_MARKER,
+    ...(threadStorage ? [threadStorage] : []),
     UI_REFERENCE,
-    ...(extraFolders.length > 0 ? [`Load, Snippet and Image also read absolute paths under: ${extraFolders.join(", ")}.`] : []),
+    ...(extraFolders.length > 0
+      ? [`Load, Snippet and Image also read absolute paths under: ${extraFolders.join(", ")}.`]
+      : []),
     UI_REFERENCE_MORE,
     CODE_WORK_INSTRUCTIONS,
     webLookups ? AGENT_INSTRUCTIONS : AGENT_INSTRUCTIONS_WEB_OFF,

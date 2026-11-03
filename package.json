@@ -1,24 +1,24 @@
 {
   "name": "paseo-plugin-genui",
-  "version": "0.3.3",
+  "version": "0.3.4-moy.1",
   "description": "Paseo plugin: agents answer with charts, diagrams, maps, plans and forms rendered inline in the chat.",
   "keywords": [
-    "paseo",
-    "paseo-plugin",
-    "generative-ui",
-    "inline-ui",
     "charts",
     "diagrams",
-    "maps"
+    "generative-ui",
+    "inline-ui",
+    "maps",
+    "paseo",
+    "paseo-plugin"
   ],
-  "author": "anh-chu",
+  "homepage": "https://github.com/Moyf/paseo-plugin-genui#readme",
+  "bugs": "https://github.com/Moyf/paseo-plugin-genui/issues",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/anh-chu/paseo-plugin-genui#readme",
+  "author": "anh-chu",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anh-chu/paseo-plugin-genui.git"
+    "url": "git+https://github.com/Moyf/paseo-plugin-genui.git"
   },
-  "bugs": "https://github.com/anh-chu/paseo-plugin-genui/issues",
   "files": [
     "paseo-plugin.json",
     "OVERVIEW.md",

@@ -6,6 +6,8 @@ Instead of replying only with plain Markdown tables or pasted command output, ag
 
 Requires Paseo 0.14.0 or later on both the daemon and the app. Git and the GitHub CLI (`gh`) on the daemon host are optional and used only when a block includes `Changes()`, `Commits()`, or `PullRequest()`.
 
+Shared OpenCode v2 services work with Paseo 0.15. GenUI's instructions describe the thread storage directory to use in shell commands. `$BB_THREAD_STORAGE` and `$PASEO_THREAD_STORAGE` remain file aliases in `Load`, `Snippet`, and `Image`; the plugin does not export shell environment variables. Run `/genui` in an existing agent after updating to refresh its storage instructions. File saving and inline blocks work without a native `render_ui` tool.
+
 When automatic instructions are enabled, new agents receive the Generative UI component reference in their system prompt when created. For an existing agent, run `/genui` in the composer to send it the component reference, or `/genui-demo` to append an interactive sample block to the timeline. Open the **Gen-UI Gallery** from the sidebar or workspace panel to browse all 88 components across 10 groups with 170+ live examples and an interactive spec playground.
 
 ## Capabilities and data access

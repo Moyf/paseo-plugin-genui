@@ -1,16 +1,16 @@
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import type { PluginHandlerContext } from "@getpaseo/plugin/server";
-import {
-  collectLoads,
-  compile,
-  compileStreaming,
-  dataKey,
-  evaluate,
-  initialState,
-} from "./core";
+import { afterEach, describe, expect, it } from "vitest";
+import type {
+  PluginHandlerContext,
+  PluginServerContext,
+  PluginSessionOpenRequest,
+} from "@getpaseo/plugin/server";
+import contribute from "../index.server";
+import { buildAgentInstructions } from "../server/instructions";
+import { collectLoads, compile, compileStreaming, dataKey, evaluate, initialState } from "./core";
 import { COMPONENTS, type ComponentName } from "./core/catalog";
 import { checkSpec, findFences, renderReplyMarkdown } from "./fallback";
 import {
@@ -21,6 +21,7 @@ import {
 } from "./instructions";
 import { splitTimelineMessage } from "./segment";
 import {
+  agentStorageDir,
   listGallery,
   loadAgentAudio,
   loadAgentFile,
@@ -31,6 +32,197 @@ import {
 } from "../server/data-source";
 
 type PaseoApi = PluginHandlerContext["paseo"];
+
+describe("shared OpenCode sessions", () => {
+  const storageDirs = new Set<string>();
+
+  afterEach(async () => {
+    for (const dir of storageDirs) {
+      expect(path.basename(dir)).toMatch(/^genui-shared-test-/);
+      await rm(dir, { recursive: true, force: true });
+    }
+    storageDirs.clear();
+  });
+
+  function request(overrides: Partial<PluginSessionOpenRequest> = {}): PluginSessionOpenRequest {
+    const agentId = `genui-shared-test-${randomUUID()}`;
+    storageDirs.add(path.resolve(agentStorageDir(agentId)));
+    return {
+      agentId,
+      workspaceId: null,
+      provider: "opencode",
+      cwd: os.tmpdir(),
+      reason: "resume",
+      purpose: "interactive",
+      title: null,
+      labels: {},
+      env: {},
+      tools: [],
+      mcpServers: {},
+      ...overrides,
+    };
+  }
+
+  async function open(input: PluginSessionOpenRequest, autoInstructions = true) {
+    type OpenHook = (payload: {
+      request: PluginSessionOpenRequest;
+    }) => Promise<PluginSessionOpenRequest | void>;
+    let openHook: OpenHook | undefined;
+    const state = {
+      status: "ready",
+      values: { autoInstructions, webLookups: false, extraFolders: "" },
+    };
+    const server = {
+      registerSettings: () => ({ read: async () => state, subscribe: () => () => {} }),
+      before: (name: string, handler: OpenHook) => {
+        if (name === "agent.session_open") openHook = handler;
+        return () => {};
+      },
+      on: () => () => {},
+      handle: () => () => {},
+    } as unknown as PluginServerContext;
+    const cleanup = contribute(server);
+    try {
+      if (!openHook) throw new Error("GenUI did not register its session-open hook");
+      return (await openHook({ request: input })) ?? input;
+    } finally {
+      cleanup();
+    }
+  }
+
+  it.each(["create", "resume", "refresh", "import"] as const)(
+    "opens on %s without requesting process environment isolation",
+    async (reason) => {
+      const input = request({ reason });
+      const opened = await open(input);
+      expect(opened.env).toEqual({});
+      expect(opened.mcpServers).toEqual({});
+      expect(opened.tools.map((tool) => tool.name)).toContain("render_ui");
+    },
+  );
+
+  it("does not add storage overrides when reading history or when instructions are disabled", async () => {
+    for (const input of [request({ purpose: "history" }), request()]) {
+      const opened = await open(input, false);
+      expect(opened.env).toEqual(input.env);
+      expect(opened.tools).toEqual([]);
+    }
+  });
+
+  it("preserves caller environment and supports custom provider IDs", async () => {
+    const input = request({ provider: "my-opencode", env: { EXISTING: "keep" } });
+    expect((await open(input)).env).toEqual({ EXISTING: "keep" });
+    expect(input.env).toEqual({ EXISTING: "keep" });
+  });
+
+  it("provides an exact storage directory to existing agents without depending on native plugin tools", () => {
+    const first = request();
+    const second = request();
+    const firstInstructions = buildAgentInstructions(false, [], first.agentId);
+    const secondInstructions = buildAgentInstructions(false, [], second.agentId);
+    const firstDir = path.resolve(agentStorageDir(first.agentId)).replaceAll(path.sep, "/");
+    const secondDir = path.resolve(agentStorageDir(second.agentId)).replaceAll(path.sep, "/");
+    expect(path.isAbsolute(firstDir)).toBe(true);
+    expect(firstInstructions).toContain(firstDir);
+    expect(firstInstructions).not.toContain(secondDir);
+    expect(secondInstructions).toContain(secondDir);
+    expect(secondInstructions).not.toContain(firstDir);
+    expect(firstInstructions).toContain("not exported shell variables");
+  });
+
+  it("teaches newly created agents to derive storage from the session identity Paseo already provides", () => {
+    const instructions = buildAgentInstructions(false);
+    const root = path.resolve(agentStorageDir("")).replaceAll(path.sep, "/");
+    expect(instructions).toContain(root);
+    expect(instructions).toContain("$env:PASEO_AGENT_ID");
+    expect(instructions).toContain("$PASEO_AGENT_ID");
+    expect(instructions).toContain("not required to save files");
+  });
+
+  it("serves exact storage instructions through the slash command RPC and respects web lookup settings", async () => {
+    type Handler = (input: { agentId: string }) => Promise<{ instructions: string }>;
+    let instructionsHandler: Handler | undefined;
+    const server = {
+      registerSettings: () => ({
+        read: async () => ({
+          status: "ready",
+          values: { autoInstructions: true, webLookups: false, extraFolders: "" },
+        }),
+        subscribe: () => () => {},
+      }),
+      before: () => () => {},
+      on: () => () => {},
+      handle: (contract: { name: string }, handler: Handler) => {
+        if (contract.name === "genui.agent_instructions") instructionsHandler = handler;
+        return () => {};
+      },
+    } as unknown as PluginServerContext;
+    const cleanup = contribute(server);
+    try {
+      if (!instructionsHandler) throw new Error("Missing instructions RPC");
+      const input = request();
+      const result = await instructionsHandler({ agentId: input.agentId });
+      expect(result.instructions).toContain(
+        path.resolve(agentStorageDir(input.agentId)).replaceAll(path.sep, "/"),
+      );
+      expect(result.instructions).toContain("Web lookups are off");
+      expect(result.instructions).toContain("not required to save files");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("still loads both storage aliases and renders file-backed UI without shell environment overrides", async () => {
+    const input = request();
+    const opened = await open(input);
+    const storageDir = path.resolve(agentStorageDir(input.agentId));
+    const report = { status: "passed", count: 3 };
+    await writeFile(path.join(storageDir, "report.json"), JSON.stringify(report), "utf8");
+    const rows: unknown[] = [];
+    const paseo = {
+      agents: {
+        ref: () => ({
+          current: () => ({ cwd: input.cwd }),
+          timeline: {
+            append: async (row: unknown) => {
+              rows.push(row);
+            },
+          },
+        }),
+      },
+    } as unknown as PaseoApi;
+    for (const prefix of ["$BB_THREAD_STORAGE/", "$PASEO_THREAD_STORAGE/"]) {
+      expect(await loadAgentFile(paseo, input.agentId, `${prefix}report.json`)).toEqual({
+        ok: true,
+        value: report,
+      });
+    }
+    expect(await loadAgentFile(paseo, input.agentId, path.join(storageDir, "report.json"))).toEqual(
+      { ok: true, value: report },
+    );
+    const tool = opened.tools.find((entry) => entry.name === "render_ui")!;
+    const result = await tool.execute(
+      {
+        answer: "All three checks passed.",
+        spec: 'Card("Report", [Json(Load("$BB_THREAD_STORAGE/report.json"))])',
+      },
+      {
+        agent: {
+          id: input.agentId,
+          cwd: input.cwd,
+          provider: input.provider,
+          title: null,
+          workspaceId: null,
+          parentAgentId: null,
+        },
+        paseo,
+        signal: new AbortController().signal,
+      },
+    );
+    expect(result.isError).not.toBe(true);
+    expect(rows).toHaveLength(2);
+  });
+});
 
 describe("paseo-plugin-genui core, instructions, and gallery", () => {
   it("compiles every example in the agent instructions cleanly", () => {
@@ -52,11 +244,11 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
   it("supports .concat() and .sort() on lists", () => {
     const compiled = compile(
       [
-        "a = [{n: \"x\", v: 3}, {n: \"y\", v: 1}]",
-        "all = a.concat([{n: \"z\", v: 2}])",
-        "Text(all.sort((p, q) => q.v - p.v).map(p => p.n).join(\",\"))",
-        "Text([10, 9, 1].sort().join(\",\"))",
-        "Text(a.map(p => p.n).join(\",\"))",
+        'a = [{n: "x", v: 3}, {n: "y", v: 1}]',
+        'all = a.concat([{n: "z", v: 2}])',
+        'Text(all.sort((p, q) => q.v - p.v).map(p => p.n).join(","))',
+        'Text([10, 9, 1].sort().join(","))',
+        'Text(a.map(p => p.n).join(","))',
       ].join("\n"),
     );
     expect(compiled.diagnostics).toEqual([]);
@@ -77,29 +269,43 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
 ])`);
     expect(compiled.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
     expect(compiled.diagnostics.filter((d) => d.severity === "warning")).toHaveLength(5);
-    expect(initialState(compiled.program!)).toEqual({ browser: "", org: "", ok: false, picks: [], n: 0 });
+    expect(initialState(compiled.program!)).toEqual({
+      browser: "",
+      org: "",
+      ok: false,
+      picks: [],
+      n: 0,
+    });
     expect(evaluate(compiled.program!, initialState(compiled.program!)).diagnostics).toEqual([]);
   });
 
   it("still reports state that no input binds to", () => {
-    const compiled = compile('Text($missing)');
-    expect(compiled.diagnostics.some((d) => d.severity === "error" && d.message.includes("unknown state `$missing`"))).toBe(true);
+    const compiled = compile("Text($missing)");
+    expect(
+      compiled.diagnostics.some(
+        (d) => d.severity === "error" && d.message.includes("unknown state `$missing`"),
+      ),
+    ).toBe(true);
   });
 
   it("renders a bare Send, OpenUrl or Copy among children as a Button", () => {
-    const compiled = compile('Card("x", [Text("a"), OpenUrl("https://docs.google.com/x"), Send("Go"), Copy("id")])');
+    const compiled = compile(
+      'Card("x", [Text("a"), OpenUrl("https://docs.google.com/x"), Send("Go"), Copy("id")])',
+    );
     expect(compiled.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
     const { roots, diagnostics } = evaluate(compiled.program!, initialState(compiled.program!));
     expect(diagnostics).toEqual([]);
-    const buttons = (roots[0]!.props.children as { type: string; props: { label: string } }[]).filter((c) => c.type === "Button");
+    const buttons = (
+      roots[0]!.props.children as { type: string; props: { label: string } }[]
+    ).filter((c) => c.type === "Button");
     expect(buttons.map((b) => b.props.label)).toEqual(["Open docs.google.com", "Go", "Copy"]);
   });
 
   it("supports .replace() and .replaceAll() on text", () => {
     const compiled = compile(
       [
-        "Text(\"katalon-studio/a-b-b\".replace(\"katalon-studio/\", \"\").replaceAll(\"-\", \" \"))",
-        "Text(\"a.b\".replace(\".\", \"$&!\"))",
+        'Text("katalon-studio/a-b-b".replace("katalon-studio/", "").replaceAll("-", " "))',
+        'Text("a.b".replace(".", "$&!"))',
       ].join("\n"),
     );
     expect(compiled.diagnostics).toEqual([]);
@@ -110,20 +316,24 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
   it("accepts a declared function's name as a list method's function", () => {
     const compiled = compile(
       [
-        "items = [{n: \"x\", v: 3}, {n: \"y\", v: 1}, {n: \"z\", v: 2}]",
+        'items = [{n: "x", v: 3}, {n: "y", v: 1}, {n: "z", v: 2}]',
         "label = (p, i) => `${i}:${p.n}`",
         "big = p => p.v > 1",
         "byV = (a, b) => a.v - b.v",
-        "Text(items.filter(big).map(label).join(\",\"))",
-        "Text(items.sort(byV).map(p => p.n).join(\",\"))",
+        'Text(items.filter(big).map(label).join(","))',
+        'Text(items.sort(byV).map(p => p.n).join(","))',
         "row = p => [p.n, p.v]",
-        "Table([\"n\", \"v\"], items.map(row))",
+        'Table(["n", "v"], items.map(row))',
       ].join("\n"),
     );
     expect(compiled.diagnostics).toEqual([]);
     const { roots } = evaluate(compiled.program!, initialState(compiled.program!));
     expect(roots.slice(0, 2).map((root) => root.props.text)).toEqual(["0:x,1:z", "y,z,x"]);
-    expect(roots[2].props.rows).toEqual([["x", 3], ["y", 1], ["z", 2]]);
+    expect(roots[2].props.rows).toEqual([
+      ["x", 3],
+      ["y", 1],
+      ["z", 2],
+    ]);
   });
 
   it("covers all 86 catalog components in the gallery and compiles + evaluates every gallery spec", async () => {
@@ -163,7 +373,8 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
     const plain = "Hello world\n```ts\nconst x = 1;\n```";
     expect(splitTimelineMessage(plain, "complete")).toBeUndefined();
 
-    const streaming = "Here is your estimate:\n```ui\n$seats = 10\nCard(\"Estimate\", [Metric(\"Seats\", $seats)])";
+    const streaming =
+      'Here is your estimate:\n```ui\n$seats = 10\nCard("Estimate", [Metric("Seats", $seats)])';
     const splitStream = splitTimelineMessage(streaming, "streaming", "msg_1");
     expect(splitStream?.items).toHaveLength(2);
     expect(splitStream?.items[0]).toMatchObject({
@@ -180,7 +391,7 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
       },
     });
 
-    const streamCompile = compileStreaming("$seats = 10\nCard(\"Estimate\", [Metric(\"Seats\", $seats");
+    const streamCompile = compileStreaming('$seats = 10\nCard("Estimate", [Metric("Seats", $seats');
     expect(streamCompile.program).not.toBeNull();
   });
 
@@ -203,9 +414,8 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
   });
 
   it("validates specs with checkSpec", async () => {
-    const valid = await checkSpec(
-      'Card("Test", [Metric("Users", "42")])',
-      (req) => loadGalleryFile(req.path, req),
+    const valid = await checkSpec('Card("Test", [Metric("Users", "42")])', (req) =>
+      loadGalleryFile(req.path, req),
     );
     expect(valid.ok).toBe(true);
     expect(valid.report).toContain("No errors.");
@@ -242,13 +452,22 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
         },
       } as unknown as PaseoApi;
 
-      const allowed = await loadAgentFile(mockPaseo, "agent_symlink_test", "allowed.txt", { raw: true });
+      const allowed = await loadAgentFile(mockPaseo, "agent_symlink_test", "allowed.txt", {
+        raw: true,
+      });
       expect(allowed).toEqual({ ok: true, value: "inside-workspace-line\n" });
 
-      const directSymlink = await loadAgentFile(mockPaseo, "agent_symlink_test", "report.txt", { raw: true });
+      const directSymlink = await loadAgentFile(mockPaseo, "agent_symlink_test", "report.txt", {
+        raw: true,
+      });
       expect(directSymlink.ok).toBe(false);
 
-      const dirSymlink = await loadAgentFile(mockPaseo, "agent_symlink_test", "linked-dir/secret.txt", { raw: true });
+      const dirSymlink = await loadAgentFile(
+        mockPaseo,
+        "agent_symlink_test",
+        "linked-dir/secret.txt",
+        { raw: true },
+      );
       expect(dirSymlink.ok).toBe(false);
 
       const imageSymlink = await loadAgentImage(mockPaseo, "agent_symlink_test", "report.png");
@@ -267,16 +486,35 @@ describe("paseo-plugin-genui core, instructions, and gallery", () => {
       const file = path.join(folder, "notes.txt");
       await writeFile(file, "scratch-line\n", "utf8");
       const mockPaseo = {
-        agents: { ref: () => ({ current: () => ({ cwd: "/nonexistent-workspace" }), refresh: async () => null }) },
+        agents: {
+          ref: () => ({
+            current: () => ({ cwd: "/nonexistent-workspace" }),
+            refresh: async () => null,
+          }),
+        },
       } as unknown as PaseoApi;
       const tilde = `~/${path.basename(folder)}/notes.txt`;
 
-      expect((await loadAgentFile(mockPaseo, "agent_extra_test", file, { raw: true })).ok).toBe(false);
+      expect((await loadAgentFile(mockPaseo, "agent_extra_test", file, { raw: true })).ok).toBe(
+        false,
+      );
 
       setExtraLoadFolders([`~/${path.basename(folder)}`]);
-      expect(await loadAgentFile(mockPaseo, "agent_extra_test", file, { raw: true })).toEqual({ ok: true, value: "scratch-line\n" });
-      expect(await loadAgentFile(mockPaseo, "agent_extra_test", tilde, { raw: true })).toEqual({ ok: true, value: "scratch-line\n" });
-      expect((await loadAgentFile(mockPaseo, "agent_extra_test", path.join(os.homedir(), ".bashrc"), { raw: true })).ok).toBe(false);
+      expect(await loadAgentFile(mockPaseo, "agent_extra_test", file, { raw: true })).toEqual({
+        ok: true,
+        value: "scratch-line\n",
+      });
+      expect(await loadAgentFile(mockPaseo, "agent_extra_test", tilde, { raw: true })).toEqual({
+        ok: true,
+        value: "scratch-line\n",
+      });
+      expect(
+        (
+          await loadAgentFile(mockPaseo, "agent_extra_test", path.join(os.homedir(), ".bashrc"), {
+            raw: true,
+          })
+        ).ok,
+      ).toBe(false);
     } finally {
       setExtraLoadFolders([]);
       await rm(folder, { recursive: true, force: true });

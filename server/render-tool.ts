@@ -1,6 +1,6 @@
 import { defineAgentTool } from "@getpaseo/plugin/server";
 import { z } from "zod";
-import { specProblems } from "../shared/fallback";
+import { actionsOnly, specProblems } from "../shared/fallback";
 import { GENUI_BLOCK_KIND, GENUI_TEXT_KIND } from "../shared/segment";
 import { loadAgentFile } from "./data-source";
 
@@ -17,7 +17,12 @@ export const renderUiTool = defineAgentTool({
     spec: z.string().describe("The ui spec, without the ``` fence"),
   }),
   async execute({ answer, spec }, { agent, paseo }) {
-    const { problems } = await specProblems(spec, (request) => loadAgentFile(paseo, agent.id, request.path, request));
+    const checked = await specProblems(spec, (request) => loadAgentFile(paseo, agent.id, request.path, request));
+    // Only here: prose before a render_ui call is often lost in the agent's reasoning, while a ```ui block's prose is in the reply.
+    const problems =
+      checked.roots !== null && actionsOnly(checked.roots)
+        ? [...checked.problems, "The card has only buttons. Put what each option does, and the findings behind the choice, in the card itself (Text, Callout, Table, Steps)."]
+        : checked.problems;
     if (problems.length > 0) {
       return {
         isError: true,

@@ -28,7 +28,7 @@ Requires Paseo 0.14.0 or later.
 
 ## What an answer looks like
 
-The agent passes a UI spec and a one-sentence answer to its `render_ui` tool. The plugin shows the answer as text above the card, so it reaches the user even when the agent wrote it only in its reasoning. The plugin checks the spec first and adds the card to the chat only when it renders; otherwise the tool returns the errors and the agent fixes them in the same turn. Agents without the tool write the same spec as a ```ui block in their reply, and the plugin asks them once to fix a block that fails.
+The agent writes a UI spec as a ```ui block in its reply, after a plain answer sentence. If a block fails, the plugin asks the agent once to fix it. Agents can also pass a spec and a one-sentence answer to the optional `render_ui` tool, which checks the spec first and adds the card only when it renders; the plugin shows the answer as text above the card. Agents used UI far more often with blocks than with the tool, so blocks are the default.
 
 A spec looks like this:
 

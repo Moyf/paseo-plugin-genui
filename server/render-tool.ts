@@ -11,7 +11,7 @@ export const renderUiTool = defineAgentTool({
   name: "render_ui",
   title: "Show UI",
   description:
-    "Show a ui spec to the user as live UI; use it instead of writing a ```ui block. The spec is checked first: if it has errors, nothing is shown and the errors come back. Fix them and call again without mentioning the errors or the retry to the user. Put the answer sentence in `answer`: it is shown as text above the UI, so do not also write it in the reply, and do not repeat the UI's content in text after it.",
+    "Optional: show a ui spec to the user as live UI, checked first. A ```ui block in the reply is the usual way; use this when the spec loads files you have not checked. If the spec has errors, nothing is shown and the errors come back. Fix them and call again without mentioning the errors or the retry to the user. Put the answer sentence in `answer`: it is shown as text above the UI, so do not also write it in the reply, and do not repeat the UI's content in text after it.",
   input: z.object({
     answer: z.string().min(1).describe("One plain sentence that gives the answer; shown above the UI"),
     spec: z.string().describe("The ui spec, without the ``` fence"),

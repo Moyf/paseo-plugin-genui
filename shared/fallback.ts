@@ -95,6 +95,23 @@ export async function renderReplyMarkdown(text: string, load: Loader, find?: Ima
   return output.join("\n");
 }
 
+const LAYOUT = new Set(["Card", "Row", "Stack", "Grid", "Tabs", "Details", "Divider", "Carousel"]);
+
+function nodeTypes(value: unknown, types: Set<string>): Set<string> {
+  if (Array.isArray(value)) value.forEach((item) => nodeTypes(item, types));
+  else if (value !== null && typeof value === "object" && (value as UiNode).kind === "node") {
+    types.add((value as UiNode).type);
+    Object.values((value as UiNode).props).forEach((prop) => nodeTypes(prop, types));
+  }
+  return types;
+}
+
+/** Buttons with nothing beside them: the findings and options they act on ended up in the agent's reasoning, which the user never sees. */
+function actionsOnly(roots: readonly UiNode[]): boolean {
+  const types = [...nodeTypes(roots, new Set())].filter((type) => !LAYOUT.has(type));
+  return types.length > 0 && types.every((type) => type === "Button" || type === "Other");
+}
+
 /** What is wrong with a spec: compile errors, files that failed to load, and evaluation errors. Empty when it renders cleanly. */
 export async function specProblems(spec: string, load: Loader): Promise<{ problems: string[]; roots: UiNode[] | null }> {
   const compiled = compile(spec);
@@ -108,6 +125,9 @@ export async function specProblems(spec: string, load: Loader): Promise<{ proble
   const problems = [
     ...loaded.flatMap(([request, result]) => (result.ok ? [] : [`${request.path}: ${result.error}`])),
     ...(diagnostics.length > 0 ? [formatDiagnostics(diagnostics)] : []),
+    ...(actionsOnly(roots)
+      ? ["The card has only buttons. Put what each option does, and the findings behind the choice, in the card itself (Text, Callout, Table, Steps)."]
+      : []),
   ];
   return { problems, roots };
 }

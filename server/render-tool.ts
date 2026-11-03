@@ -1,7 +1,7 @@
 import { defineAgentTool } from "@getpaseo/plugin/server";
 import { z } from "zod";
 import { specProblems } from "../shared/fallback";
-import { GENUI_BLOCK_KIND } from "../shared/segment";
+import { GENUI_BLOCK_KIND, GENUI_TEXT_KIND } from "../shared/segment";
 import { loadAgentFile } from "./data-source";
 
 let seq = 0;
@@ -11,9 +11,12 @@ export const renderUiTool = defineAgentTool({
   name: "render_ui",
   title: "Show UI",
   description:
-    "Show a ui spec to the user as live UI; use it instead of writing a ```ui block. The spec is checked first: if it has errors, nothing is shown and the errors come back. Fix them and call again without mentioning the errors or the retry to the user. Write your answer sentence before the call, and do not repeat the UI's content in text after it.",
-  input: z.object({ spec: z.string().describe("The ui spec, without the ``` fence") }),
-  async execute({ spec }, { agent, paseo }) {
+    "Show a ui spec to the user as live UI; use it instead of writing a ```ui block. The spec is checked first: if it has errors, nothing is shown and the errors come back. Fix them and call again without mentioning the errors or the retry to the user. Put the answer sentence in `answer`: it is shown as text above the UI, so do not also write it in the reply, and do not repeat the UI's content in text after it.",
+  input: z.object({
+    answer: z.string().min(1).describe("One plain sentence that gives the answer; shown above the UI"),
+    spec: z.string().describe("The ui spec, without the ``` fence"),
+  }),
+  async execute({ answer, spec }, { agent, paseo }) {
     const { problems } = await specProblems(spec, (request) => loadAgentFile(paseo, agent.id, request.path, request));
     if (problems.length > 0) {
       return {
@@ -22,6 +25,14 @@ export const renderUiTool = defineAgentTool({
       };
     }
     const id = `genui-render-${Date.now()}-${++seq}`;
+    // The answer travels in the tool input because agents often write it in their reasoning, which the user never sees.
+    await paseo.agents.ref(agent.id).timeline.append({
+      type: "plugin",
+      id: `${id}-answer`,
+      kind: GENUI_TEXT_KIND,
+      version: 1,
+      data: { text: answer, phase: "complete" },
+    });
     await paseo.agents.ref(agent.id).timeline.append({
       type: "plugin",
       id,
